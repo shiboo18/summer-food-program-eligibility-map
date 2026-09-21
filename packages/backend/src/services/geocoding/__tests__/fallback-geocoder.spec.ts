@@ -44,6 +44,39 @@ describe("FallbackGeocoder", () => {
     await expect(geocoder.geocode(anAddress)).resolves.toBeUndefined();
   });
 
+  test("continues to the next geocoder when one throws", async () => {
+    const throwing: Geocoder = {
+      geocode: vi.fn(async () => {
+        throw new Error("Smarty outage");
+      }),
+    };
+    const geocoder = new FallbackGeocoder([throwing, stub(result(100, "esri"))]);
+
+    await expect(geocoder.geocode(anAddress)).resolves.toMatchObject({ source: "esri", score: 100 });
+  });
+
+  test("throws the last error only when every geocoder fails", async () => {
+    const throwing = (message: string): Geocoder => ({
+      geocode: vi.fn(async () => {
+        throw new Error(message);
+      }),
+    });
+    const geocoder = new FallbackGeocoder([throwing("smarty down"), throwing("esri down")]);
+
+    await expect(geocoder.geocode(anAddress)).rejects.toThrow("esri down");
+  });
+
+  test("prefers a returned result over a thrown geocoder", async () => {
+    const throwing: Geocoder = {
+      geocode: vi.fn(async () => {
+        throw new Error("esri down");
+      }),
+    };
+    const geocoder = new FallbackGeocoder([stub(result(85, "smarty")), throwing]);
+
+    await expect(geocoder.geocode(anAddress)).resolves.toMatchObject({ source: "smarty", score: 85 });
+  });
+
   test("requires at least one geocoder", () => {
     expect(() => new FallbackGeocoder([])).toThrow("at least one geocoder");
   });

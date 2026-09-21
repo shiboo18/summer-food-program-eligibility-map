@@ -8,7 +8,6 @@ import {
   RESULT_COLUMNS,
   SettingsStore,
   SmartyAddressValidator,
-  SmartyGeocoder,
   SpreadsheetValidationService,
   UsdaAreaEligibilityChecker,
   UsdaRuralChecker,
@@ -18,6 +17,7 @@ import {
   type ResultAnnotation,
   type RowVerification,
   type RunProgress,
+  type GeocodeResult,
   type SpreadsheetSummary,
 } from "../../../backend/dist/index.js";
 import {
@@ -74,15 +74,12 @@ function createSmartyAddressValidator(settings: SettingsStore): SmartyAddressVal
 }
 
 /**
- * The eligibility pipeline: geocode with the sponsor's Smarty account first,
- * falling back to the free Esri World Geocoder, then run the USDA rural and
- * 3-state area checks against the located coordinate.
+ * The eligibility geocoder. Smarty coordinates are reused from the validation
+ * step (seeded per row), so the eligibility pipeline only needs the free Esri
+ * World Geocoder as a fallback for rows Smarty could not locate.
  */
-function createEligibilityRunner(settings: SettingsStore): EligibilityRunner {
-  const geocoder = new FallbackGeocoder([
-    new SmartyGeocoder(createSmartyCredentialsProvider(settings)),
-    new EsriGeocoder(),
-  ]);
+function createEligibilityRunner(): EligibilityRunner {
+  const geocoder = new FallbackGeocoder([new EsriGeocoder()]);
   return new EligibilityRunner(geocoder, new UsdaRuralChecker(), new UsdaAreaEligibilityChecker());
 }
 
@@ -162,13 +159,15 @@ function requireOpenedSpreadsheet(
 function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesService): void {
   const reader = new ExcelSpreadsheetReader();
   const validation = new SpreadsheetValidationService(reader, createSmartyAddressValidator(settings));
-  const eligibility = createEligibilityRunner(settings);
+  const eligibility = createEligibilityRunner();
   /** Summaries are kept in the main process so the renderer never supplies a file path. */
   const openedSpreadsheets = new Map<string, SpreadsheetSummary>();
   /** Per-row Smarty verification (status + standardized address) from the most recent run, used for the export. */
   const rowVerifications = new Map<string, ReadonlyMap<number, RowVerification>>();
   /** Where each file's results were last exported, so the renderer can reveal it by name, never by path. */
   const exportedPaths = new Map<string, string>();
+  /** Smarty coordinates from the most recent validation, reused by eligibility so Smarty is called once. */
+  const smartyGeocodes = new Map<string, ReadonlyMap<number, GeocodeResult>>();
 
   ipcMain.handle("spreadsheet:open", async (event): Promise<unknown> => {
     assertTrustedSender(event);
@@ -209,13 +208,14 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
     const summary = requireOpenedSpreadsheet(openedSpreadsheets, fileName);
 
     const columnMapping = parseColumnMapping(mapping, summary.headers);
-    const { report, verifications } = await validation.validate({
+    const { report, verifications, geocodes } = await validation.validate({
       filePath: summary.filePath,
       mapping: columnMapping,
       fileName: summary.fileName,
       onProgress: reportProgressTo(event, summary.rowCount),
     });
     rowVerifications.set(summary.fileName, verifications);
+    smartyGeocodes.set(summary.fileName, geocodes);
     return report;
   });
 
@@ -274,7 +274,8 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
     const columnMapping = parseColumnMapping(mapping, summary.headers);
     const selectedChecks = toEligibilityChecks(checks);
     const { rows, skipped } = await reader.readAddressRows(summary.filePath, columnMapping);
-    return eligibility.run(rows, selectedChecks, summary.fileName, skipped);
+    const seedGeocodes = smartyGeocodes.get(summary.fileName);
+    return eligibility.run(rows, selectedChecks, summary.fileName, skipped, seedGeocodes);
   });
 
   ipcMain.handle("settings:get-status", async (event): Promise<unknown> => {

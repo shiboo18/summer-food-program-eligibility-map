@@ -1,5 +1,6 @@
 import type { AddressValidator, SpreadsheetReader } from "../contracts.js";
 import type { Address, FailedAddress, RowVerification, ValidationReport } from "../types/address.js";
+import type { GeocodeResult } from "../types/eligibility.js";
 import type { ProgressReporter } from "../types/progress.js";
 import type { AddressRowsResult, ColumnMapping } from "../types/spreadsheet.js";
 
@@ -10,6 +11,11 @@ export interface SpreadsheetValidationResult {
   readonly verifications: ReadonlyMap<number, RowVerification>;
   /** The rows parsed from the workbook. */
   readonly addressRows: AddressRowsResult;
+  /**
+   * The coordinate Smarty returned for each row, keyed by row number, so the
+   * eligibility pipeline can reuse it instead of sending the address again.
+   */
+  readonly geocodes: ReadonlyMap<number, GeocodeResult>;
 }
 
 /** One pass over a partner's workbook: where to read it from, and how. */
@@ -54,6 +60,7 @@ export class SpreadsheetValidationService {
       onProgress === undefined ? undefined : (completed) => onProgress(completed + skipped.length),
     );
     const verifications = new Map<number, RowVerification>();
+    const geocodes = new Map<number, GeocodeResult>();
     let verified = 0;
     let corrected = 0;
     for (const [index, row] of rows.entries()) {
@@ -66,6 +73,14 @@ export class SpreadsheetValidationService {
         });
         verifications.set(row.rowNumber, { status: "unverified" });
         continue;
+      }
+      if (result.location !== undefined) {
+        geocodes.set(row.rowNumber, {
+          point: { lat: result.location.lat, lng: result.location.lng },
+          score: result.location.score,
+          matchedAddress: formatAddress(result.normalizedAddress ?? row.address),
+          source: "smarty",
+        });
       }
       if (result.status === "corrected" && result.normalizedAddress !== undefined) {
         corrected += 1;
@@ -90,6 +105,7 @@ export class SpreadsheetValidationService {
       },
       verifications,
       addressRows,
+      geocodes,
     };
   }
 }

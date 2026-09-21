@@ -132,4 +132,46 @@ describe("EligibilityRunner", () => {
     expect(skippedResult).toMatchObject({ rowNumber: 2, confidence: "none", needsVerification: true });
     expect(skippedResult.messages).toEqual(["Missing street address."]);
   });
+
+  test("reuses a high-confidence Smarty seed and skips the fallback geocoder", async () => {
+    const { runner: subject, geocoder } = runner({});
+    const seed = new Map<number, GeocodeResult>([
+      [1, { point: { lat: 9, lng: 9 }, score: 100, matchedAddress: "SEED", source: "smarty" }],
+    ]);
+
+    const report = await subject.run([row(1, "1 Main St")], { rural: true, area: true }, "file.xlsx", [], seed);
+
+    expect(geocoder.geocode).not.toHaveBeenCalled();
+    expect(report.rows[0]).toMatchObject({ matchedAddress: "SEED", score: 100, confidence: "high" });
+  });
+
+  test("falls back to the geocoder when the seed is low confidence and keeps the better score", async () => {
+    const { runner: subject, geocoder } = runner({ geocode: async () => geocode(100) });
+    const seed = new Map<number, GeocodeResult>([
+      [1, { point: { lat: 9, lng: 9 }, score: 85, matchedAddress: "SEED", source: "smarty" }],
+    ]);
+
+    const report = await subject.run([row(1, "1 Main St")], { rural: true, area: true }, "file.xlsx", [], seed);
+
+    expect(geocoder.geocode).toHaveBeenCalledTimes(1);
+    expect(report.rows[0]).toMatchObject({ score: 100, confidence: "high", matchedAddress: "1 MAIN ST" });
+  });
+
+  test("records a row as needs-verification when a checker throws, and still completes the batch", async () => {
+    const geocoder: Geocoder = { geocode: vi.fn(async () => geocode(100)) };
+    const ruralChecker: RuralChecker = {
+      check: vi.fn(async () => {
+        throw new Error("USDA rural service unavailable");
+      }),
+    };
+    const areaChecker: AreaEligibilityChecker = { check: vi.fn(async () => areaEligible) };
+    const subject = new EligibilityRunner(geocoder, ruralChecker, areaChecker);
+
+    const report = await subject.run([row(1, "1 Main St"), row(2, "2 Main St")], { rural: true, area: true }, "file.xlsx");
+
+    expect(report.rows).toHaveLength(2);
+    expect(report.rows[0]).toMatchObject({ rowNumber: 1, confidence: "none", needsVerification: true });
+    expect(report.rows[0].messages[0]).toContain("could not be checked");
+    expect(report.rows[0].messages[0]).toContain("USDA rural service unavailable");
+  });
 });

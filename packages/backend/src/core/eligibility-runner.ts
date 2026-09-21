@@ -10,12 +10,12 @@ import type { AddressRow, SkippedRow } from "../types/spreadsheet.js";
 import { GEOCODE_CONFIDENCE_THRESHOLD } from "../config/constants.js";
 
 /**
- * Runs the USDA eligibility pipeline over a spreadsheet's mapped rows: geocode
- * each address, gate on the match score, then run the selected rural and area
- * checks against the located coordinate. Rows that cannot be located, or whose
- * coordinate is too approximate, are flagged for verification. Rows skipped
- * during reading (incomplete addresses) are reported too, so the total matches
- * the spreadsheet.
+ * Runs the USDA eligibility pipeline over a spreadsheet's mapped rows: reuse the
+ * Smarty coordinate found during address validation (passed in as a seed),
+ * falling back to the geocoder only when Smarty had no or a low-confidence
+ * coordinate, then run the selected rural and area checks. Rows that cannot be
+ * located, are too approximate, error out, or were skipped while reading are all
+ * flagged for verification so the batch always completes.
  */
 export class EligibilityRunner {
   public constructor(
@@ -30,10 +30,21 @@ export class EligibilityRunner {
     checks: EligibilityChecks,
     fileName: string,
     skipped: readonly SkippedRow[] = [],
+    seedGeocodes: ReadonlyMap<number, GeocodeResult> = new Map(),
   ): Promise<EligibilityReport> {
     const results: EligibilityRowResult[] = [];
     for (const row of rows) {
-      results.push(await this.runRow(row, checks));
+      try {
+        results.push(await this.runRow(row, checks, seedGeocodes.get(row.rowNumber)));
+      } catch (error: unknown) {
+        // One flaky row must not abort the whole batch.
+        results.push({
+          rowNumber: row.rowNumber,
+          confidence: "none",
+          needsVerification: true,
+          messages: [`USDA eligibility could not be checked: ${errorMessage(error)}`],
+        });
+      }
     }
     for (const row of skipped) {
       results.push({
@@ -59,8 +70,12 @@ export class EligibilityRunner {
     };
   }
 
-  private async runRow(row: AddressRow, checks: EligibilityChecks): Promise<EligibilityRowResult> {
-    const geocode = await this.geocoder.geocode(row.address);
+  private async runRow(
+    row: AddressRow,
+    checks: EligibilityChecks,
+    seed: GeocodeResult | undefined,
+  ): Promise<EligibilityRowResult> {
+    const geocode = await this.resolveGeocode(row, seed);
     if (geocode === undefined) {
       return {
         rowNumber: row.rowNumber,
@@ -88,7 +103,31 @@ export class EligibilityRunner {
     };
   }
 
+  /**
+   * Prefer the Smarty seed when it is high confidence; otherwise consult the
+   * fallback geocoder and keep whichever coordinate scores higher. This reuses
+   * Smarty's already-fetched coordinate and only calls the geocoder when Smarty
+   * was missing or coarse.
+   */
+  private async resolveGeocode(row: AddressRow, seed: GeocodeResult | undefined): Promise<GeocodeResult | undefined> {
+    if (seed !== undefined && seed.score >= this.confidenceThreshold) {
+      return seed;
+    }
+    const fallback = await this.geocoder.geocode(row.address);
+    if (fallback === undefined) {
+      return seed;
+    }
+    if (seed === undefined) {
+      return fallback;
+    }
+    return fallback.score > seed.score ? fallback : seed;
+  }
+
   private confidenceFor(geocode: GeocodeResult): LocationConfidence {
     return geocode.score >= this.confidenceThreshold ? "high" : "low";
   }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

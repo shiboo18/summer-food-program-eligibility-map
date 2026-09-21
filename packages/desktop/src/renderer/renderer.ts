@@ -603,7 +603,8 @@ async function performRun(): Promise<void> {
     let eligibility: EligibilityReport | null = null;
     if (checks.rural || checks.area) {
       processingStatus.textContent = "Checking USDA eligibility for each located address.";
-      processingPrivacy.textContent = "Only the coordinates leave your computer.";
+      processingPrivacy.textContent =
+        "Some addresses are also sent to Esri to find their exact location. Esri makes ArcGIS, the mapping software USDA and many governments use.";
       eligibility = await bridge.eligibility.check(selectedSpreadsheet.fileName, mapping, checks);
     }
     lastReport = report;

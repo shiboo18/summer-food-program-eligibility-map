@@ -28,7 +28,6 @@ export { RESULT_COLUMNS } from "./config/constants.js";
 /* USDA eligibility. */
 export { FetchJsonHttpClient } from "./services/http/fetch-json-http-client.js";
 export { EsriGeocoder } from "./services/geocoding/esri-geocoder.js";
-export { SmartyGeocoder } from "./services/geocoding/smarty-geocoder.js";
 export { FallbackGeocoder } from "./services/geocoding/fallback-geocoder.js";
 export { UsdaRuralChecker } from "./services/usda/rural-checker.js";
 export { UsdaAreaEligibilityChecker } from "./services/usda/area-eligibility-checker.js";

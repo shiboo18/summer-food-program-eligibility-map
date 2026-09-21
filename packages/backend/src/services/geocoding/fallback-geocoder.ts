@@ -25,8 +25,17 @@ export class FallbackGeocoder implements Geocoder {
 
   public async geocode(address: Address): Promise<GeocodeResult | undefined> {
     let best: GeocodeResult | undefined;
+    let lastError: unknown;
     for (const geocoder of this.geocoders) {
-      const result = await geocoder.geocode(address);
+      let result: GeocodeResult | undefined;
+      try {
+        result = await geocoder.geocode(address);
+      } catch (error: unknown) {
+        // A failing geocoder should not abort the chain; try the next one and
+        // only surface an error if every geocoder fails.
+        lastError = error;
+        continue;
+      }
       if (result === undefined) {
         continue;
       }
@@ -37,6 +46,12 @@ export class FallbackGeocoder implements Geocoder {
         best = result;
       }
     }
-    return best;
+    if (best !== undefined) {
+      return best;
+    }
+    if (lastError !== undefined) {
+      throw lastError;
+    }
+    return undefined;
   }
 }

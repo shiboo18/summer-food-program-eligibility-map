@@ -114,10 +114,25 @@ function toResult(address: Address, lookup: SmartyLookup | undefined): AddressVe
     };
   }
 
+  const location = candidateToLocation(candidate);
+  const base = location !== undefined ? { location } : {};
   if (!addressesMatch(address, normalizedAddress)) {
-    return { status: "corrected", inputAddress: address, normalizedAddress, messages: [] };
+    return { status: "corrected", inputAddress: address, normalizedAddress, messages: [], ...base };
   }
-  return { status: "verified", inputAddress: address, normalizedAddress, messages: [] };
+  return { status: "verified", inputAddress: address, normalizedAddress, messages: [], ...base };
+}
+
+function candidateToLocation(
+  candidate: InstanceType<typeof SmartySDK.usStreet.Candidate>,
+): { lat: number; lng: number; score: number } | undefined {
+  const { latitude, longitude, precision } = candidate.metadata;
+  if (latitude === undefined || longitude === undefined) {
+    return undefined;
+  }
+  // Only a rooftop match is high confidence; coarser (ZIP/block) matches score
+  // below the gate so the eligibility pipeline flags them for verification.
+  const score = precision !== undefined && precision.toLowerCase().includes("rooftop") ? 100 : 85;
+  return { lat: latitude, lng: longitude, score };
 }
 
 function createLookup(address: Address): SmartyLookup {
