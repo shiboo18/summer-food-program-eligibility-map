@@ -3,3 +3,4 @@
 export * from "./address.js";
 export * from "./progress.js";
 export * from "./spreadsheet.js";
+export * from "./eligibility.js";

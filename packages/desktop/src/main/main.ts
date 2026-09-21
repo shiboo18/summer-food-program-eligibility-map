@@ -1,12 +1,19 @@
 import {
+  EligibilityRunner,
+  EsriGeocoder,
   ExcelSpreadsheetReader,
+  FallbackGeocoder,
   PreferencesService,
   PreferencesStore,
   RESULT_COLUMNS,
   SettingsStore,
   SmartyAddressValidator,
+  SmartyGeocoder,
   SpreadsheetValidationService,
+  UsdaAreaEligibilityChecker,
+  UsdaRuralChecker,
   parseColumnMapping,
+  type EligibilityChecks,
   type ProgressReporter,
   type ResultAnnotation,
   type RowVerification,
@@ -66,6 +73,19 @@ function createSmartyAddressValidator(settings: SettingsStore): SmartyAddressVal
   return new SmartyAddressValidator(createSmartyCredentialsProvider(settings));
 }
 
+/**
+ * The eligibility pipeline: geocode with the sponsor's Smarty account first,
+ * falling back to the free Esri World Geocoder, then run the USDA rural and
+ * 3-state area checks against the located coordinate.
+ */
+function createEligibilityRunner(settings: SettingsStore): EligibilityRunner {
+  const geocoder = new FallbackGeocoder([
+    new SmartyGeocoder(createSmartyCredentialsProvider(settings)),
+    new EsriGeocoder(),
+  ]);
+  return new EligibilityRunner(geocoder, new UsdaRuralChecker(), new UsdaAreaEligibilityChecker());
+}
+
 function resolvedSystemTheme(): "light" | "dark" {
   return nativeTheme.shouldUseDarkColors ? "dark" : "light";
 }
@@ -108,6 +128,12 @@ function reportProgressTo(event: IpcMainInvokeEvent, total: number): ProgressRep
   };
 }
 
+/** Reads which USDA checks the user ticked; anything unrecognised is treated as unticked. */
+function toEligibilityChecks(input: unknown): EligibilityChecks {
+  const checks = typeof input === "object" && input !== null ? (input as Record<string, unknown>) : {};
+  return { rural: checks.rural === true, area: checks.area === true };
+}
+
 function assertTrustedSender(event: IpcMainInvokeEvent): void {
   const senderFrame = event.senderFrame;
   if (senderFrame === null || !isAllowedNavigation(senderFrame.url, rendererUrl)) {
@@ -136,6 +162,7 @@ function requireOpenedSpreadsheet(
 function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesService): void {
   const reader = new ExcelSpreadsheetReader();
   const validation = new SpreadsheetValidationService(reader, createSmartyAddressValidator(settings));
+  const eligibility = createEligibilityRunner(settings);
   /** Summaries are kept in the main process so the renderer never supplies a file path. */
   const openedSpreadsheets = new Map<string, SpreadsheetSummary>();
   /** Per-row Smarty verification (status + standardized address) from the most recent run, used for the export. */
@@ -233,6 +260,21 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
       throw new Error("Export the results before opening them.");
     }
     shell.showItemInFolder(exportedPath);
+  });
+
+  ipcMain.handle("eligibility:check", async (event, input: unknown): Promise<unknown> => {
+    assertTrustedSender(event);
+    if (typeof input !== "object" || input === null) {
+      throw new Error("Eligibility request is invalid.");
+    }
+
+    const { fileName, mapping, checks } = input as { fileName?: unknown; mapping?: unknown; checks?: unknown };
+    const summary = requireOpenedSpreadsheet(openedSpreadsheets, fileName);
+
+    const columnMapping = parseColumnMapping(mapping, summary.headers);
+    const selectedChecks = toEligibilityChecks(checks);
+    const { rows, skipped } = await reader.readAddressRows(summary.filePath, columnMapping);
+    return eligibility.run(rows, selectedChecks, summary.fileName, skipped);
   });
 
   ipcMain.handle("settings:get-status", async (event): Promise<unknown> => {

@@ -48,3 +48,31 @@ export interface SpreadsheetWriter {
     options: ResultColumnOptions,
   ): Promise<void>;
 }
+
+/* USDA eligibility ports. */
+
+import type { GeocodeResult, GeoPoint, AreaEligibilityResult, RuralResult } from "./types/eligibility.js";
+
+/**
+ * A minimal HTTP-GET-returning-JSON seam. The USDA and Esri services depend on
+ * this interface so tests can stub network responses instead of making real
+ * calls.
+ */
+export interface JsonHttpClient {
+  getJson(url: string, params: Record<string, string>): Promise<unknown>;
+}
+
+export interface Geocoder {
+  /** Resolves an address to a coordinate, or `undefined` when it cannot be located. */
+  geocode(address: Address): Promise<GeocodeResult | undefined>;
+}
+
+export interface RuralChecker {
+  /** Determines whether a coordinate falls in a USDA-designated rural area. */
+  check(point: GeoPoint): Promise<RuralResult>;
+}
+
+export interface AreaEligibilityChecker {
+  /** Determines the 3-state USDA area eligibility for a coordinate. */
+  check(point: GeoPoint): Promise<AreaEligibilityResult>;
+}

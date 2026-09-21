@@ -2,6 +2,8 @@ import type {
   ColumnMapping,
   CredentialInput,
   CredentialStatus,
+  EligibilityChecks,
+  EligibilityReport,
   Preferences,
   RunProgress,
   ValidationReport,
@@ -41,6 +43,9 @@ declare global {
       readonly run: {
         /** Subscribes to a run's progress. Returns the unsubscribe function. */
         onProgress(listener: (progress: RunProgress) => void): () => void;
+      };
+      readonly eligibility: {
+        check(fileName: string, mapping: ColumnMapping, checks: EligibilityChecks): Promise<EligibilityReport>;
       };
       readonly settings: {
         getStatus(): Promise<CredentialStatus>;
