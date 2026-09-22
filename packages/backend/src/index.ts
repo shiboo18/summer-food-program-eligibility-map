@@ -32,3 +32,4 @@ export { FallbackGeocoder } from "./services/geocoding/fallback-geocoder.js";
 export { UsdaRuralChecker } from "./services/usda/rural-checker.js";
 export { UsdaAreaEligibilityChecker } from "./services/usda/area-eligibility-checker.js";
 export { EligibilityRunner } from "./core/eligibility-runner.js";
+export { toResultAnnotations } from "./core/result-annotation.js";

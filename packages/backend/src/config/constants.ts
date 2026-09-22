@@ -20,6 +20,9 @@
 export const RESULT_COLUMNS = {
   standardized: "Standardized Address",
   deliverability: "Address Checks",
+  rural: "USDA Rural",
+  area: "USDA Area Eligibility",
+  ready: "Ready to Ship",
 } as const;
 
 /**

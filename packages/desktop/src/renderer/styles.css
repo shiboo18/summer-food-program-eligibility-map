@@ -1215,3 +1215,49 @@ html[data-motion="reduced"] *::after {
 .results-table tr[data-state="warning"] td {
   color: var(--text-soft);
 }
+
+/* Column definitions panel */
+.results-legend {
+  margin: 14px 0 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+  padding: 10px 14px;
+}
+
+.results-legend > summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.results-legend-list {
+  margin: 12px 0 2px;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+}
+
+.results-legend-list dt {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.results-legend-list dd {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+@media (max-width: 620px) {
+  .results-legend-list {
+    grid-template-columns: 1fr;
+    gap: 2px 0;
+  }
+  .results-legend-list dd {
+    margin-bottom: 8px;
+  }
+}

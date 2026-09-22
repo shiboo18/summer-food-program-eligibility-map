@@ -12,9 +12,10 @@ import {
   UsdaAreaEligibilityChecker,
   UsdaRuralChecker,
   parseColumnMapping,
+  toResultAnnotations,
   type EligibilityChecks,
+  type EligibilityReport,
   type ProgressReporter,
-  type ResultAnnotation,
   type RowVerification,
   type RunProgress,
   type GeocodeResult,
@@ -87,27 +88,6 @@ function resolvedSystemTheme(): "light" | "dark" {
   return nativeTheme.shouldUseDarkColors ? "dark" : "light";
 }
 
-/** One deliverability annotation per verified row, keyed by row number, in order. */
-function toAnnotations(verifications: ReadonlyMap<number, RowVerification>): readonly ResultAnnotation[] {
-  return [...verifications.entries()]
-    .sort(([left], [right]) => left - right)
-    .map(([rowNumber, verification]): ResultAnnotation => {
-      if (verification.status === "corrected") {
-        return {
-          rowNumber,
-          deliverability: "Valid and corrected",
-          ...(verification.standardizedAddress === undefined
-            ? {}
-            : { standardizedAddress: verification.standardizedAddress }),
-        };
-      }
-      return {
-        rowNumber,
-        deliverability: verification.status === "verified" ? "Valid" : "Invalid",
-      };
-    });
-}
-
 /**
  * A reporter that forwards validation progress to the frame that asked for the
  * run, so the screen can fill its bar as the work goes rather than only when it
@@ -168,6 +148,8 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
   const exportedPaths = new Map<string, string>();
   /** Smarty coordinates from the most recent validation, reused by eligibility so Smarty is called once. */
   const smartyGeocodes = new Map<string, ReadonlyMap<number, GeocodeResult>>();
+  /** USDA results from the most recent eligibility run, added to the export when present. */
+  const eligibilityRuns = new Map<string, { checks: EligibilityChecks; report: EligibilityReport }>();
 
   ipcMain.handle("spreadsheet:open", async (event): Promise<unknown> => {
     assertTrustedSender(event);
@@ -216,6 +198,8 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
     });
     rowVerifications.set(summary.fileName, verifications);
     smartyGeocodes.set(summary.fileName, geocodes);
+    /* A new validation run supersedes any earlier USDA results for this file. */
+    eligibilityRuns.delete(summary.fileName);
     return report;
   });
 
@@ -230,7 +214,13 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
     if (verifications === undefined) {
       throw new Error("Validate the addresses again before downloading results.");
     }
-    const annotations = toAnnotations(verifications);
+    const run = eligibilityRuns.get(summary.fileName);
+    const annotations = toResultAnnotations(
+      verifications,
+      run === undefined
+        ? undefined
+        : { checks: run.checks, rows: new Map(run.report.rows.map((row) => [row.rowNumber, row])) },
+    );
 
     const suggestedName = summary.fileName.replace(/\.(xlsx|xlsm|xls)$/i, "") + "-results.xlsx";
     const selection = await dialog.showSaveDialog({
@@ -275,7 +265,9 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
     const selectedChecks = toEligibilityChecks(checks);
     const { rows, skipped } = await reader.readAddressRows(summary.filePath, columnMapping);
     const seedGeocodes = smartyGeocodes.get(summary.fileName);
-    return eligibility.run(rows, selectedChecks, summary.fileName, skipped, seedGeocodes);
+    const report = await eligibility.run(rows, selectedChecks, summary.fileName, skipped, seedGeocodes);
+    eligibilityRuns.set(summary.fileName, { checks: selectedChecks, report });
+    return report;
   });
 
   ipcMain.handle("settings:get-status", async (event): Promise<unknown> => {

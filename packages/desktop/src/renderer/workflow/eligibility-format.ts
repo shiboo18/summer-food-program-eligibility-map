@@ -33,3 +33,27 @@ export function locationLabel(result: EligibilityRowResult): string {
   }
   return result.needsVerification ? "Verify location" : "Located";
 }
+
+/** "Verify?" column: Yes when the location is too approximate to trust, "—" when not located. */
+export function verifyLabel(result: EligibilityRowResult): string {
+  if (result.confidence === "none") {
+    return "—";
+  }
+  return result.needsVerification ? "Yes" : "No";
+}
+
+/**
+ * A row is ready to ship when it is deliverable, confidently located, in a USDA
+ * rural area, and area-eligible.
+ */
+export function isReady(result: EligibilityRowResult, deliverable: boolean): boolean {
+  const areaEligible =
+    result.area?.eligibility === "eligible" || result.area?.eligibility === "averaged-eligible";
+  const rural = result.rural?.designation === "rural";
+  return deliverable && !result.needsVerification && rural && areaEligible;
+}
+
+/** Yes/No column label for ready-to-ship. */
+export function readyLabel(result: EligibilityRowResult, deliverable: boolean): string {
+  return isReady(result, deliverable) ? "Yes" : "No";
+}

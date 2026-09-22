@@ -196,6 +196,18 @@
           <section id="results-section" class="results-section" aria-labelledby="intro-title" hidden>
             <div id="results-stats" class="results-stats" aria-live="polite"></div>
             <div id="results-body" class="results-body"></div>
+            <details class="results-legend">
+              <summary>What these columns mean</summary>
+              <dl class="results-legend-list">
+                <dt>Row</dt><dd>The row number in your spreadsheet.</dd>
+                <dt>Standardized address</dt><dd>The matched, cleaned-up address (USPS-standardized when deliverable).</dd>
+                <dt>Deliv.</dt><dd>Deliverable — USPS confirms mail is delivered there. "No" means it couldn't be confirmed as mailable (common for rural addresses).</dd>
+                <dt>Rural</dt><dd>The address is in a USDA-designated rural area.</dd>
+                <dt>Area</dt><dd>USDA area eligibility: In zone / In zone (with approval) / Out of zone.</dd>
+                <dt>Ready</dt><dd>Deliverable, confidently located, rural, and area-eligible — good to ship.</dd>
+                <dt>Verify?</dt><dd>"Yes" means the location is approximate — double-check this row before relying on its USDA result.</dd>
+              </dl>
+            </details>
             <div class="form-actions">
               <button id="download-results" class="primary-button is-active" type="button">
                 <span id="download-spinner" class="loading-spinner" aria-hidden="true" hidden></span>

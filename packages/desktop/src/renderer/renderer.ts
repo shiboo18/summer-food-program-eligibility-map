@@ -1,6 +1,7 @@
 import type {
   ColumnMapping,
   CredentialStatus,
+  EligibilityChecks,
   EligibilityReport,
   Preferences,
   RunProgress,
@@ -26,7 +27,7 @@ import {
   selectedEligibilityChecks,
   type EligibilityCheckSelection,
 } from "./workflow/eligibility-checks.js";
-import { areaLabel, locationLabel, ruralLabel } from "./workflow/eligibility-format.js";
+import { areaLabel, isReady, readyLabel, ruralLabel, verifyLabel } from "./workflow/eligibility-format.js";
 import { createSettingsPanel } from "./settings/settings-panel.js";
 import { singleFlight } from "./workflow/single-flight.js";
 import { workflowSteps } from "./workflow/steps/index.js";
@@ -112,6 +113,8 @@ type Stage = "upload" | "map-columns" | "checks" | "results";
 let stage: Stage = "upload";
 let selectedSpreadsheet: SpreadsheetSelection | null = null;
 let lastReport: ValidationReport | null = null;
+/** The USDA checks the last run made, so the export message can name their columns. */
+let lastChecks: EligibilityChecks | null = null;
 
 const workflowStepList = getRequiredElement<HTMLOListElement>("#workflow-steps");
 
@@ -455,10 +458,17 @@ function renderRunResults(report: ValidationReport, eligibility: EligibilityRepo
       { value: eligibility.ruralCount, label: "USDA rural", tone: "good" },
       { value: eligibility.areaEligibleCount, label: "Area eligible", tone: "good" },
       { value: eligibility.needingVerification, label: "Location unsure", tone: "neutral" },
+      { value: countReady(report, eligibility), label: "Ready to ship", tone: "good" },
     );
   }
   renderResultsStats(stats);
   renderEligibilityRows(report, eligibility);
+}
+
+/** Rows that are deliverable, confidently located, rural, and area-eligible. */
+function countReady(report: ValidationReport, eligibility: EligibilityReport): number {
+  const failedRows = new Set(report.failures.map((failure) => failure.rowNumber));
+  return eligibility.rows.filter((result) => isReady(result, !failedRows.has(result.rowNumber))).length;
 }
 
 /** One row per address with its USDA verdicts; nothing when no USDA check was chosen. */
@@ -473,7 +483,7 @@ function renderEligibilityRows(report: ValidationReport, eligibility: Eligibilit
   table.className = "results-table";
   const head = document.createElement("thead");
   const headRow = document.createElement("tr");
-  for (const heading of ["Row", "Matched address", "Deliverable", "Rural", "Area", "Location"]) {
+  for (const heading of ["Row", "Standardized address", "Deliv.", "Rural", "Area", "Ready", "Verify?"]) {
     const cell = document.createElement("th");
     cell.textContent = heading;
     headRow.append(cell);
@@ -485,13 +495,15 @@ function renderEligibilityRows(report: ValidationReport, eligibility: Eligibilit
     if (result.needsVerification) {
       row.dataset.state = "warning";
     }
+    const deliverable = !failureReasons.has(result.rowNumber);
     const cells = [
       String(result.rowNumber),
       result.matchedAddress ?? "—",
-      failureReasons.has(result.rowNumber) ? "No" : "Yes",
+      deliverable ? "Yes" : "No",
       ruralLabel(result.rural?.designation),
       areaLabel(result.area?.eligibility),
-      locationLabel(result),
+      readyLabel(result, deliverable),
+      verifyLabel(result),
     ];
     for (const value of cells) {
       const cell = document.createElement("td");
@@ -608,6 +620,7 @@ async function performRun(): Promise<void> {
       eligibility = await bridge.eligibility.check(selectedSpreadsheet.fileName, mapping, checks);
     }
     lastReport = report;
+    lastChecks = eligibility === null ? null : checks;
     renderRunResults(report, eligibility);
     processingSection.hidden = true;
     goToStage("results");
@@ -670,6 +683,9 @@ function renderExportMessage(filePath: string): void {
   const added: readonly { readonly label: string; readonly note?: string }[] = [
     { label: "Standardized Address", note: "corrected rows only" },
     { label: "Address Checks" },
+    ...(lastChecks?.rural === true ? [{ label: "USDA Rural" }] : []),
+    ...(lastChecks?.area === true ? [{ label: "USDA Area Eligibility" }] : []),
+    ...(lastChecks !== null && (lastChecks.rural || lastChecks.area) ? [{ label: "Ready to Ship" }] : []),
   ];
 
   const lead = document.createElement("p");
