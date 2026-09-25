@@ -1,0 +1,16 @@
+{
+  // Typechecks the specs, which the build config excludes. See the backend's
+  // equivalent for why. The project reference is dropped so the backend types
+  // resolve from its emitted dist, which is what the sources import; run this
+  // after a build.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.cts"],
+  "exclude": [],
+  "references": []
+}

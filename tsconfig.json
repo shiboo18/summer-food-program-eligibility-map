@@ -1,11 +1,7 @@
 {
-  "extends": ["@tsconfig/node24"],
-  "compilerOptions": {
-    "declaration": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "sourceMap": true,
-    "declarationMap": true
-  },
-  "include": ["src"]
+  "files": [],
+  "references": [
+    { "path": "./packages/backend" },
+    { "path": "./packages/desktop" }
+  ]
 }

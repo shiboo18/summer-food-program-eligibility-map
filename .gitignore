@@ -2,3 +2,8 @@
 /build
 /dist
 /coverage
+/packages/*/dist
+.env
+.env.*
+.idea
+*.iml

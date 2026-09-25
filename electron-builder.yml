@@ -1,0 +1,84 @@
+# electron-builder configuration for vibeCheck.
+#
+# Run from this package root (the npm workspace root): the packaged "main"
+# entry resolves packages/desktop/dist and packages/backend/dist relative to
+# here, and production dependencies are hoisted into the root node_modules.
+#
+# Prerequisites:
+#   brazil-build install   # populate hoisted node_modules from the registry
+# The package scripts compile first, so run one of:
+#   npm run package        # macOS and Windows together
+#   npm run package:mac    # dmg + zip, arm64 and x64
+#   npm run package:win    # nsis installer, x64
+
+appId: com.amazon.vibecheck
+productName: vibeCheck
+
+directories:
+  output: build/electron
+  buildResources: build-resources
+
+# Never let electron-builder run its own public-registry install or rebuild;
+# dependencies come from the internal registry and there are no native modules.
+npmRebuild: false
+
+asar: true
+
+# Electron fuses, flipped in the packaged binary. The partner's addresses and their
+# Smarty credentials are only as private as the process that reads them, so the ways
+# of turning that process into a general-purpose Node runtime are closed off.
+# resetAdHocDarwinSignature is required because flipping a fuse invalidates the
+# signature of the unsigned macOS build above.
+electronFuses:
+  runAsNode: false
+  enableNodeCliInspectArguments: false
+  enableNodeOptionsEnvironmentVariable: false
+  onlyLoadAppFromAsar: true
+  resetAdHocDarwinSignature: true
+
+# Explicit whitelist so packaging pulls only compiled output, the workspace
+# package manifests, and the root manifest — not the whole monorepo. Production
+# dependencies (e.g. smartystreets-javascript-sdk, hoisted to the root
+# node_modules) are added automatically by electron-builder.
+files:
+  - "package.json"
+  - "packages/desktop/dist/**/*"
+  - "packages/desktop/package.json"
+  - "packages/backend/dist/**/*"
+  - "packages/backend/package.json"
+  - "!**/*.map"
+
+artifactName: "vibeCheck-${version}-${arch}.${ext}"
+
+mac:
+  # Unsigned local artifacts by default: no certificate, no notarization.
+  # Gatekeeper will warn on first launch. To sign later, add a Developer ID
+  # (or internal) identity and the corresponding hardenedRuntime/notarize
+  # settings — do not set placeholder values here.
+  identity: null
+  category: public.app-category.productivity
+  icon: build-resources/icon.icns
+  target:
+    - target: dmg
+      arch: [universal]
+    - target: zip
+      arch: [universal]
+
+win:
+  # Unsigned by default: no certificateFile / certificateSubjectName, so
+  # cross-builds from macOS are deterministic. Unsigned installers trigger
+  # SmartScreen warnings. To sign later, supply CSC_LINK / CSC_KEY_PASSWORD.
+  signAndEditExecutable: false
+  icon: build-resources/icon.ico
+  # One installer carrying both architectures; Windows has no universal binary,
+  # so NSIS picks the right build at install time.
+  artifactName: "vibeCheck-${version}-setup.${ext}"
+  target:
+    - target: nsis
+      arch: [x64, arm64]
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  artifactName: "vibeCheck-${version}-${arch}-setup.${ext}"

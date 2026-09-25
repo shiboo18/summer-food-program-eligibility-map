@@ -1,0 +1,16 @@
+{
+  // Typechecks the specs, which the build config excludes. Without this, a stub
+  // that no longer matches the interface it doubles for, or a type import whose
+  // path is wrong, passes silently: vitest erases types and never complains.
+  // "lib" adds DOM because the http specs stub fetch with its request types.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "declaration": false,
+    "declarationMap": false,
+    "lib": ["ES2024", "DOM"],
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": []
+}

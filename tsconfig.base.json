@@ -1,0 +1,17 @@
+{
+  "extends": ["@tsconfig/node24"],
+  "compilerOptions": {
+    "declaration": true,
+    "declarationMap": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "noEmitOnError": true,
+    /* Dead code fails the build rather than accumulating. Prefix a parameter with
+       `_` when an unused one is required by the signature being implemented. */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "sourceMap": true,
+    "strict": true,
+    "types": ["node"]
+  }
+}
