@@ -1,0 +1,1178 @@
+/* Calm white + light-orange theme. Dark mode uses warm charcoal surfaces. */
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("./fonts/manrope-latin-wght-normal.woff2") format("woff2-variations");
+}
+
+:root {
+  --radius-lg: 18px;
+  --radius-md: 11px;
+  --radius-sm: 8px;
+  --fade: 220ms ease;
+  font-family: "Manrope", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+html[data-theme="light"] {
+  --page: #fffaf6;
+  --page-accent: #ffeadb;
+  --surface: #ffffff;
+  --surface-soft: #fff5ed;
+  --border: #f0ded1;
+  --border-strong: #dfc3b1;
+  --text: #3d332e;
+  --text-soft: #786a62;
+  --text-faint: #9b8c84;
+  --accent: #efa06f;
+  --accent-strong: #d97d49;
+  --accent-text: #382016;
+  --success: #46765a;
+  --danger: #aa5437;
+  --shadow: rgba(92, 61, 43, 0.08);
+  --overlay: rgba(255, 248, 242, 0.88);
+  --focus: rgba(217, 125, 73, 0.38);
+}
+
+html[data-theme="dark"] {
+  --page: #171411;
+  --page-accent: #2a211b;
+  --surface: #211c18;
+  --surface-soft: #2a231e;
+  --border: #3c312a;
+  --border-strong: #58473c;
+  --text: #f3ebe5;
+  --text-soft: #c0b2a9;
+  --text-faint: #93867e;
+  --accent: #f2a572;
+  --accent-strong: #ffba89;
+  --accent-text: #29180f;
+  --success: #86c69b;
+  --danger: #f0a083;
+  --shadow: rgba(0, 0, 0, 0.28);
+  --overlay: rgba(23, 20, 17, 0.9);
+  --focus: rgba(255, 186, 137, 0.44);
+}
+
+html[data-contrast="high"][data-theme="light"] {
+  --text: #201814;
+  --text-soft: #493b34;
+  --border: #c39f89;
+  --border-strong: #9b6f55;
+  --accent-strong: #a94f1d;
+}
+
+html[data-contrast="high"][data-theme="dark"] {
+  --text: #ffffff;
+  --text-soft: #e4d9d1;
+  --border: #796457;
+  --border-strong: #a48877;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  color: var(--text);
+  background: linear-gradient(145deg, var(--surface) 0%, var(--page) 68%, var(--page-accent) 100%) fixed;
+  transition: color var(--fade), background var(--fade);
+}
+
+button,
+input,
+select {
+  color: inherit;
+  font: inherit;
+}
+
+:focus-visible {
+  border-radius: var(--radius-sm);
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+h3,
+h4,
+p {
+  margin-top: 0;
+}
+
+/* A column at least as tall as the window, so the header and the footer are the
+   first and last rows of every view and only the middle grows with content. */
+.app-shell {
+  display: flex;
+  flex-direction: column;
+  width: min(1060px, calc(100% - 48px));
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 28px 0 22px;
+}
+
+.app-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 42px;
+}
+
+.product-lockup {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 4px 6px 4px 4px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: background var(--fade);
+}
+
+.product-lockup:hover {
+  background: var(--surface-soft);
+}
+
+.home-view {
+  max-width: 100%;
+  padding: 10px 2px 12px;
+  animation: gentle-fade var(--fade);
+}
+
+.home-view h1,
+.home-copy {
+  max-width: 100%;
+}
+
+.home-view h1 {
+  margin-bottom: 10px;
+  font-size: clamp(1.7rem, 3.4vw, 2.2rem);
+  font-weight: 300;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+}
+
+.home-copy {
+  margin-bottom: 16px;
+  color: var(--text-soft);
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+
+.text-link {
+  color: var(--accent-strong);
+  font-weight: 600;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.text-link:hover {
+  text-decoration: underline;
+}
+
+/* Inside a sentence, colour alone reads as emphasis rather than as a control. */
+.intro-copy .text-link {
+  text-decoration: underline;
+}
+
+.privacy-note {
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+}
+
+.privacy-note-summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.privacy-note[open] .privacy-note-summary {
+  margin-bottom: 10px;
+}
+
+.privacy-note-lead {
+  margin: 0 0 8px;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+
+.privacy-note-detail {
+  margin: 0 0 6px;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+
+.privacy-providers {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+
+.privacy-providers strong {
+  color: var(--text);
+}
+
+.home-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(200px, calc(50% - 6px)), 1fr));
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+
+.home-step {
+  padding: 14px 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 10px 26px var(--shadow);
+}
+
+.home-step-number {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  margin-bottom: 8px;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--accent-text);
+  background: var(--accent);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.home-step h2 {
+  margin-bottom: 4px;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+
+.home-step p {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.app-mark {
+  width: 42px;
+  height: 42px;
+  flex: 0 0 42px;
+  border-radius: 11px;
+}
+
+.product-brand {
+  display: grid;
+  gap: 2px;
+}
+
+.product-name {
+  display: block;
+  font-size: 1.05rem;
+  font-weight: 500;
+  letter-spacing: -0.025em;
+}
+
+.cobrand {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 7px;
+}
+
+.cobrand-primary,
+.cobrand-secondary {
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+}
+
+.cobrand-secondary {
+  position: relative;
+  padding-left: 11px;
+  color: var(--accent-strong);
+}
+
+.cobrand-secondary::before {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 1px;
+  height: 0.95em;
+  background: var(--border-strong);
+  content: "";
+  transform: translateY(-50%);
+}
+
+.cobrand-connector {
+  color: var(--text-faint);
+  font-size: 0.65rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.gear-button {
+  display: grid;
+  width: 40px;
+  height: 40px;
+  margin-left: auto;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-soft);
+  background: var(--surface);
+  cursor: pointer;
+  transition: color var(--fade), border-color var(--fade), background var(--fade);
+}
+
+.gear-button:hover {
+  color: var(--accent-strong);
+  border-color: var(--border-strong);
+  background: var(--surface-soft);
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: 210px minmax(0, 1fr);
+  gap: 30px;
+  align-items: start;
+  padding-top: 34px;
+}
+
+.workflow-sidebar {
+  position: sticky;
+  top: 28px;
+  padding: 20px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 10px 28px var(--shadow);
+}
+
+.workflow-sidebar-title {
+  margin-bottom: 14px;
+  padding-left: 4px;
+  color: var(--text-faint);
+  font-size: 0.63rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.workflow-steps {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.workflow-step-button {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  color: var(--text-soft);
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  transition: color var(--fade), background var(--fade);
+}
+
+.workflow-step-number {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-soft);
+  font-size: 0.71rem;
+  font-weight: 700;
+}
+
+.workflow-step-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.workflow-step-button:hover:not(:disabled) {
+  color: var(--text);
+  background: var(--surface-soft);
+}
+
+.workflow-step[data-state="active"] .workflow-step-button {
+  color: var(--text);
+  background: var(--page-accent);
+}
+
+.workflow-step[data-state="active"] .workflow-step-number {
+  border-color: var(--accent);
+  color: var(--accent-text);
+  background: var(--accent);
+}
+
+.workflow-step[data-state="complete"] .workflow-step-number {
+  border-color: var(--border-strong);
+  color: var(--accent-strong);
+}
+
+/* Unfinished steps stay grayed out until their prerequisites are met. */
+.workflow-step[data-state="upcoming"] .workflow-step-button {
+  color: var(--text-faint);
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.intro {
+  max-width: 700px;
+  padding: 0 2px 24px;
+}
+
+.eyebrow {
+  margin-bottom: 8px;
+  color: var(--accent-strong);
+  font-size: 0.67rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.intro h1 {
+  margin-bottom: 12px;
+  font-size: clamp(1.9rem, 4vw, 2.8rem);
+  font-weight: 300;
+  line-height: 1.07;
+  letter-spacing: -0.035em;
+}
+
+.intro-copy {
+  margin-bottom: 0;
+  color: var(--text-soft);
+  font-size: 0.98rem;
+  line-height: 1.6;
+}
+
+.excel-upload {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 22px;
+  padding: 20px 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 10px 28px var(--shadow);
+}
+
+.excel-upload-controls {
+  display: grid;
+  min-width: 220px;
+  gap: 7px;
+}
+
+.upload-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+}
+
+.upload-button:disabled {
+  cursor: wait;
+  opacity: 0.72;
+}
+
+.loading-spinner {
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent-strong);
+  border-radius: 50%;
+  animation: spinner-rotate 700ms linear infinite;
+}
+
+/* Sized down from the button spinner to sit on a line of this status text. */
+.status-spinner {
+  width: 11px;
+  height: 11px;
+  flex: none;
+}
+
+.excel-file-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 17px;
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 0.69rem;
+  line-height: 1.4;
+}
+
+.excel-file-status[data-state="valid"] {
+  color: var(--success);
+}
+
+.excel-file-status[data-state="error"] {
+  color: var(--danger);
+}
+
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.settings-view,
+.welcome-card {
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 14px 36px var(--shadow);
+}
+
+.field {
+  display: grid;
+  gap: 7px;
+}
+
+.field label,
+.settings-form label,
+.settings-group > label,
+.welcome-card > label {
+  color: var(--text);
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.field input,
+.settings-form input,
+.settings-select {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  transition: border-color var(--fade), background var(--fade);
+}
+
+.field input::placeholder {
+  color: var(--text-faint);
+}
+
+.form-actions,
+.settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-top: 4px;
+}
+
+.primary-button,
+.secondary-button {
+  padding: 11px 18px;
+  border-radius: var(--radius-sm);
+  font-size: 0.79rem;
+  font-weight: 700;
+  transition: color var(--fade), border-color var(--fade), background var(--fade);
+}
+
+.primary-button {
+  border: 0;
+  color: var(--text-faint);
+  background: var(--surface-soft);
+}
+
+.primary-button.is-active {
+  color: var(--accent-text);
+  background: var(--accent);
+  box-shadow: 0 6px 15px rgba(217, 125, 73, 0.18);
+  cursor: pointer;
+}
+
+.primary-button.is-active:hover {
+  background: var(--accent-strong);
+}
+
+.secondary-button {
+  border: 1px solid var(--border-strong);
+  color: var(--text-soft);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.secondary-button:hover {
+  color: var(--text);
+  background: var(--surface-soft);
+}
+
+.form-message,
+.settings-message {
+  min-height: 18px;
+  margin: 0;
+  font-size: 0.73rem;
+}
+
+.form-message[data-state="error"],
+.settings-message[data-state="error"] {
+  color: var(--danger);
+}
+
+.settings-message[data-state="success"] {
+  color: var(--success);
+}
+
+.mapping-section,
+.results-section {
+  margin-bottom: 22px;
+  padding: clamp(20px, 3vw, 30px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 12px 30px var(--shadow);
+  animation: gentle-fade var(--fade);
+}
+
+.mapping-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 16px;
+}
+
+.mapping-form label small {
+  color: var(--text-faint);
+  font-weight: 500;
+}
+
+.mapping-actions {
+  grid-column: 1 / -1;
+  align-items: center;
+  margin-top: 4px;
+}
+
+.results-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.export-message-lead {
+  margin: 0 0 6px;
+}
+
+.export-columns {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 3px;
+}
+
+.settings-view {
+  margin-top: 30px;
+  padding: clamp(24px, 4vw, 38px);
+  border-radius: var(--radius-lg);
+  animation: gentle-fade var(--fade);
+}
+
+.settings-view-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.settings-view-head h2 {
+  margin: 0;
+  font-weight: 300;
+}
+
+.settings-column {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 34px;
+}
+
+.settings-group h3 {
+  margin-bottom: 8px;
+  font-weight: 400;
+}
+
+.settings-intro {
+  margin-bottom: 18px;
+  color: var(--text-soft);
+  font-size: 0.81rem;
+  line-height: 1.55;
+}
+
+.settings-form {
+  display: grid;
+  gap: 8px;
+}
+
+.settings-form label,
+.settings-group > label {
+  display: grid;
+  gap: 7px;
+  margin-top: 8px;
+}
+
+.settings-hint {
+  margin: 4px 0 12px;
+  color: var(--text-faint);
+  font-size: 0.69rem;
+}
+
+.provider-fields {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+  animation: gentle-fade var(--fade);
+}
+
+.credential-fields {
+  display: grid;
+  gap: 7px;
+}
+
+/* Header cell fields sit side by side; each label stays with its own input. */
+/* Header cell fields sit side by side; each label stays with its own input. The
+   subhead above supplies the gap, so the grid adds none of its own. */
+.cell-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: var(--dialog-heading-gap, 10px) 16px;
+  margin-top: 0;
+}
+
+.cell-field {
+  display: grid;
+  gap: 5px;
+}
+
+.cell-field label {
+  color: var(--text);
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.cell-field input {
+  text-transform: uppercase;
+}
+
+/* The settings dialogs each hold one short form, so they stay narrow.
+
+   One vertical rhythm governs everything inside: `--dialog-gap` between blocks,
+   and the tighter `--dialog-heading-gap` between a heading and what it
+   introduces. Both are declared here so every rule below reads from one place
+   rather than each picking its own margin. */
+.settings-dialog-card {
+  --dialog-gap: 18px;
+  --dialog-heading-gap: 10px;
+  width: min(560px, 100%);
+  gap: 0;
+  background: var(--surface);
+  box-shadow: 0 18px 50px var(--shadow);
+}
+
+.settings-dialog-card h3 {
+  margin-bottom: var(--dialog-heading-gap);
+}
+
+/* Standing copy under a dialog title, explaining the form without a button to
+   reveal it. */
+.dialog-subtext {
+  margin: 0 0 var(--dialog-gap);
+  color: var(--text-soft);
+  font-size: 0.74rem;
+  line-height: 1.6;
+}
+
+.settings-dialog-card .settings-actions {
+  margin-top: var(--dialog-gap);
+}
+
+.settings-check {
+  align-self: center;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.settings-check[data-configured="true"] {
+  color: var(--success);
+  font-size: 1.05rem;
+}
+
+.settings-check[data-configured="false"] {
+  color: var(--text-soft);
+  font-weight: 500;
+}
+
+.provider-fields-head,
+.credential-label {
+  display: flex !important;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.provider-fields-head a {
+  color: var(--accent-strong);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-underline-offset: 3px;
+}
+
+.credential-label strong {
+  color: var(--danger);
+  font-size: 0.68rem;
+  font-weight: 600;
+}
+
+.credential-label strong[data-configured="true"] {
+  color: var(--success);
+}
+
+.settings-subhead {
+  margin: var(--dialog-gap, 18px) 0 var(--dialog-heading-gap, 10px);
+}
+
+.settings-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+  color: var(--text-soft);
+}
+
+/* Inside a dialog the shared `.settings-form label` grid rule is more specific
+   than `.settings-toggle`, so it would stack the box above its text. */
+.settings-form label.settings-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+/* `.settings-form input` stretches text inputs to full width; a checkbox must
+   keep its intrinsic size. */
+.settings-form .settings-toggle input {
+  width: auto;
+}
+
+.settings-toggle input {
+  margin-top: 3px;
+  accent-color: var(--accent-strong);
+}
+
+.settings-toggle strong,
+.settings-toggle small {
+  display: block;
+}
+
+.settings-toggle strong {
+  color: var(--text);
+  font-size: 0.8rem;
+}
+
+.settings-toggle small {
+  margin-top: 2px;
+  color: var(--text-faint);
+  font-size: 0.7rem;
+}
+
+.welcome-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  padding: 24px;
+  place-items: center;
+  background: var(--overlay);
+  backdrop-filter: blur(6px);
+  animation: overlay-fade var(--fade);
+}
+
+.welcome-card {
+  position: relative;
+  display: grid;
+  width: min(880px, 100%);
+  max-height: calc(100vh - 48px);
+  padding: clamp(32px, 5vw, 52px);
+  overflow-y: auto;
+  gap: 28px;
+  border-radius: var(--radius-lg);
+}
+
+/* Held to the bottom edge of the shell rather than to the end of the content, so
+   a short step and a tall step put the runtime line in the same place. */
+.app-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  margin-top: auto;
+  padding: 20px 3px 0;
+  color: var(--text-faint);
+  font-size: 0.68rem;
+}
+
+@keyframes gentle-fade {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes overlay-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0ms !important;
+  transition-duration: 0ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-view,
+  .welcome-overlay {
+    animation: none;
+  }
+}
+
+@media (max-width: 760px) {
+  .app-shell {
+    width: min(100% - 28px, 1060px);
+  }
+
+  .settings-column,
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-sidebar {
+    position: static;
+  }
+
+  .workflow-steps {
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+  }
+
+  .workflow-step-label {
+    display: none;
+  }
+
+  .workflow-step-button {
+    justify-content: center;
+  }
+
+  .excel-upload {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .excel-upload-controls {
+    min-width: 0;
+  }
+
+}
+
+@media (max-width: 520px) {
+  .cobrand-connector {
+    display: none;
+  }
+
+  .app-footer {
+    flex-direction: column;
+  }
+}
+
+/* Processing (waiting) screen — mock 05 */
+.processing-section {
+  display: grid;
+  place-items: center;
+  padding: clamp(28px, 6vw, 64px) 0;
+  animation: gentle-fade var(--fade);
+}
+
+.processing-card {
+  width: min(520px, 100%);
+  display: grid;
+  gap: 16px;
+  justify-items: center;
+  text-align: center;
+  padding: clamp(28px, 4vw, 40px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: 0 14px 36px var(--shadow);
+}
+
+.processing-card h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.processing-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  overflow: hidden;
+}
+
+.processing-bar-fill {
+  display: block;
+  height: 100%;
+  width: 100%;
+  border-radius: 999px;
+  background: var(--accent-strong);
+  transform-origin: left center;
+  animation: processing-fill 1.6s ease-in-out infinite;
+}
+
+/* Until the first row is reported there is no fraction to show, so the bar fills
+   over and over. It fades at full width so restarting at the left edge reads as
+   another pass and not as progress lost. */
+@keyframes processing-fill {
+  0% {
+    width: 0;
+    opacity: 1;
+  }
+  75% {
+    width: 100%;
+    opacity: 1;
+  }
+  100% {
+    width: 100%;
+    opacity: 0;
+  }
+}
+
+/* Once rows are reported the bar holds the fraction done, easing to each new
+   position so a batch landing does not read as a jump. */
+.processing-bar[data-state="determinate"] .processing-bar-fill {
+  width: 0;
+  animation: none;
+  opacity: 1;
+  transition: width 240ms ease-out;
+}
+
+.processing-percent {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  color: var(--accent-strong);
+}
+
+.processing-percent:empty {
+  display: none;
+}
+
+.processing-count {
+  margin: 0;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.processing-status {
+  margin: 0;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+}
+
+.processing-privacy {
+  margin: 0;
+  color: var(--success);
+  font-size: 0.8rem;
+}
+
+/* With motion off, the determinate fill still shows the fraction done; it just
+   eases to each new position without the reduced-motion sweep. */
+[data-motion="reduced"] .processing-bar-fill {
+  animation: none;
+}
+
+/* Results summary stat tiles — mock 06 */
+.results-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin: 4px 0 18px;
+}
+
+.results-stat {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.results-stat-value {
+  font-size: 1.6rem;
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--text);
+}
+
+.results-stat[data-tone="good"] .results-stat-value {
+  color: var(--success);
+}
+
+.results-stat-label {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+@media (max-width: 620px) {
+  .results-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-labelledby="title">
+  <title id="title">vibeCheck flowing v and c monogram</title>
+  <rect x="8" y="8" width="240" height="240" rx="58" fill="#fffaf6" stroke="#f0ded1" stroke-width="8" />
+  <path
+    d="M46 62 L105 190 Q112 204 121 184 Q129 158 133 128"
+    fill="none"
+    stroke="#d97d49"
+    stroke-width="18"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+  <path
+    d="M216 88 C191 60 153 65 138 99 C120 139 142 181 180 188 C198 191 214 184 224 172"
+    fill="none"
+    stroke="#d97d49"
+    stroke-width="18"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

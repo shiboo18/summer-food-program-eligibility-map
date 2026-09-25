@@ -1,0 +1,335 @@
+<!doctype html>
+<html lang="en" data-theme="light" data-contrast="normal" data-motion="full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>vibeCheck</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <button id="home-link" class="product-lockup" type="button" aria-label="vibeCheck home" title="vibeCheck home">
+          <img class="app-mark" src="./assets/vibecheck-icon.svg" alt="" width="42" height="42" />
+          <span class="product-brand">
+            <span class="product-name">vibeCheck</span>
+            <span class="cobrand">
+              <span class="cobrand-primary">Share Our Strength</span>
+              <span class="cobrand-connector">with</span>
+              <span class="cobrand-secondary">Amazon</span>
+            </span>
+          </span>
+        </button>
+        <button
+          id="settings-toggle"
+          class="gear-button"
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded="false"
+          aria-controls="settings-view"
+          aria-label="Settings"
+          title="Settings"
+        >
+          <svg class="gear-icon" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" focusable="false">
+            <path
+              d="M9.7 3.5h4.6l.5 2.2c.5.2 1 .5 1.4.8l2.1-.7 2.3 4-1.7 1.5a7.3 7.3 0 0 1 0 1.5l1.7 1.5-2.3 4-2.1-.7c-.4.3-.9.6-1.4.8l-.5 2.2H9.7l-.5-2.2c-.5-.2-1-.5-1.4-.8l-2.1.7-2.3-4 1.7-1.5a7.3 7.3 0 0 1 0-1.5L3.4 9.8l2.3-4 2.1.7c.4-.3.9-.6 1.4-.8l.5-2.2Z"
+              fill="none"
+              stroke="currentColor"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+            />
+            <circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.5" />
+          </svg>
+        </button>
+      </header>
+
+      <section id="home-view" class="home-view" aria-labelledby="home-title">
+        <h1 id="home-title">Welcome to vibeCheck.</h1>
+        <p class="home-copy">
+          vibeCheck verifies and standardizes every address in an Excel workbook against Smarty.
+          <a id="home-settings-link" class="text-link" href="#" role="button">Open settings</a> to add your Smarty
+          credentials.
+        </p>
+
+        <details class="privacy-note">
+          <summary class="privacy-note-summary">🔒 Click to see the privacy note</summary>
+          <p class="privacy-note-lead">
+            Your data stays on your computer. Only the address fields are sent out — never names, phone numbers, or
+            anything else in your spreadsheet.
+          </p>
+          <p class="privacy-note-detail">Each address is sent only to the provider that checks it:</p>
+          <ul class="privacy-providers">
+            <li><strong>Smarty</strong> — verifies and standardizes each address.</li>
+          </ul>
+        </details>
+
+        <ol id="home-steps" class="home-steps"></ol>
+
+        <div class="form-actions">
+          <button id="home-start" class="primary-button is-active" type="button">Get started</button>
+        </div>
+      </section>
+
+      <div id="app-view" class="workspace" hidden>
+        <nav class="workflow-sidebar" aria-label="Validation steps">
+          <p class="workflow-sidebar-title">Steps</p>
+          <ol id="workflow-steps" class="workflow-steps"></ol>
+        </nav>
+
+        <div class="workflow-main">
+          <section class="intro" aria-labelledby="intro-title">
+            <p id="intro-eyebrow" class="eyebrow">Step 1 of 3</p>
+            <h1 id="intro-title">Upload an Excel file</h1>
+            <p id="intro-copy" class="intro-copy">
+              Choose the workbook that contains the addresses you want to validate.
+            </p>
+          </section>
+
+          <section id="upload-section" class="excel-upload" aria-labelledby="intro-title">
+            <div class="excel-upload-controls">
+              <button id="upload-excel" class="secondary-button upload-button" type="button">
+                <span id="upload-spinner" class="loading-spinner" aria-hidden="true" hidden></span>
+                <span id="upload-label">Upload Excel file</span>
+              </button>
+              <p id="excel-file-status" class="excel-file-status" data-state="idle" aria-live="polite">
+                <span id="excel-file-spinner" class="loading-spinner status-spinner" aria-hidden="true" hidden></span>
+                <span id="excel-file-message"></span>
+              </p>
+            </div>
+          </section>
+
+          <section id="mapping-section" class="mapping-section" aria-labelledby="intro-title" hidden>
+            <form id="mapping-form" class="mapping-form" novalidate>
+              <div class="field">
+                <label for="map-line1">Street address</label>
+                <select id="map-line1" name="line1" class="settings-select"></select>
+              </div>
+              <div class="field">
+                <label for="map-line2">Street address line 2 <small>(optional)</small></label>
+                <select id="map-line2" name="line2" class="settings-select"></select>
+              </div>
+              <div class="field">
+                <label for="map-city">City</label>
+                <select id="map-city" name="city" class="settings-select"></select>
+              </div>
+              <div class="field">
+                <label for="map-state">State</label>
+                <select id="map-state" name="state" class="settings-select"></select>
+              </div>
+              <div class="field">
+                <label for="map-postalCode">ZIP code</label>
+                <select id="map-postalCode" name="postalCode" class="settings-select"></select>
+              </div>
+
+              <div class="form-actions mapping-actions">
+                <button id="validate-addresses" class="primary-button is-active" type="submit">
+                  Check addresses
+                </button>
+                <p id="form-message" class="form-message" aria-live="polite"></p>
+              </div>
+            </form>
+          </section>
+
+          <section id="processing-section" class="processing-section" aria-labelledby="processing-title" hidden>
+            <div class="processing-card" role="status" aria-live="polite">
+              <h2 id="processing-title">Checking addresses</h2>
+              <!-- The bar carries the value for assistive tech; the text beside it is
+                   hidden from screen readers so a per-row update cannot flood this
+                   polite live region. -->
+              <div
+                id="processing-bar"
+                class="processing-bar"
+                role="progressbar"
+                aria-labelledby="processing-title"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                data-state="indeterminate"
+              ><span id="processing-bar-fill" class="processing-bar-fill"></span></div>
+              <p id="processing-percent" class="processing-percent" aria-hidden="true"></p>
+              <p id="processing-count" class="processing-count" aria-hidden="true"></p>
+              <p id="processing-status" class="processing-status"></p>
+              <p id="processing-privacy" class="processing-privacy"></p>
+            </div>
+          </section>
+
+          <section id="results-section" class="results-section" aria-labelledby="intro-title" hidden>
+            <div id="results-stats" class="results-stats" aria-live="polite"></div>
+            <div class="form-actions">
+              <button id="download-results" class="primary-button is-active" type="button">
+                <span id="download-spinner" class="loading-spinner" aria-hidden="true" hidden></span>
+                <span id="download-label">Export results (Excel)</span>
+              </button>
+              <button id="start-over" class="secondary-button" type="button">Upload a different file</button>
+            </div>
+            <div id="download-message" class="form-message" aria-live="polite"></div>
+          </section>
+        </div>
+      </div>
+
+      <section id="settings-view" class="settings-view" aria-label="Settings" hidden>
+        <div class="settings-view-head">
+          <h2>Settings</h2>
+          <button
+            id="settings-close"
+            class="gear-button"
+            type="button"
+            aria-label="Close settings"
+            title="Close settings"
+          >
+            <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+              <path
+                d="M6 6l12 12M18 6 6 18"
+                fill="none"
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-width="1.6"
+              />
+            </svg>
+          </button>
+        </div>
+        <div class="settings-column">
+          <div class="settings-group">
+            <h3>Smarty credentials</h3>
+            <p class="settings-intro">
+              Credentials are encrypted on this device and never shown again.
+            </p>
+            <div class="settings-actions">
+              <button id="open-credentials" class="primary-button is-active" type="button">
+                Set Smarty credentials
+              </button>
+              <span id="credential-status" class="settings-check" aria-live="polite"></span>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3>Map Columns</h3>
+            <p class="settings-intro">Pick the columns your files use.</p>
+            <div class="settings-actions">
+              <button id="open-columns" class="primary-button is-active" type="button">
+                Set map columns
+              </button>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3>Appearance and accessibility</h3>
+            <p class="settings-intro">Choose a calm sunrise light theme or a pre-dawn dark theme.</p>
+            <div class="settings-actions">
+              <button id="open-appearance" class="primary-button is-active" type="button">
+                Change appearance
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer class="app-footer">
+        <span id="runtime-summary">Loading runtime information</span>
+        <span>Platform: <strong id="platform">unknown</strong></span>
+      </footer>
+    </main>
+
+    <div
+      id="credential-overlay"
+      class="welcome-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="credential-dialog-title"
+      hidden
+    >
+      <div class="welcome-card settings-dialog-card">
+        <form id="settings-form" class="settings-form">
+          <div class="provider-fields">
+            <div class="provider-fields-head">
+              <h3 id="credential-dialog-title">Secret key</h3>
+              <a
+                href="https://www.smarty.com/account/keys?account_id=17430621318&amp;tab=secret"
+                target="_blank"
+                rel="noreferrer"
+              >Open Link to see Secrets</a>
+            </div>
+            <div id="credential-fields" class="credential-fields"></div>
+          </div>
+
+          <p class="settings-hint">Leave a field blank to keep its stored value.</p>
+          <div class="settings-actions">
+            <button class="primary-button is-active" type="submit">Save securely</button>
+            <button id="clear-settings" class="secondary-button" type="button">Clear stored credentials</button>
+          </div>
+          <p id="settings-message" class="settings-message" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+
+    <div
+      id="columns-overlay"
+      class="welcome-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="columns-dialog-title"
+      hidden
+    >
+      <div class="welcome-card settings-dialog-card">
+        <form id="column-settings-form" class="settings-form">
+          <h3 id="columns-dialog-title">Map Columns</h3>
+          <p class="dialog-subtext">
+            Type the cell that holds each column's header, such as A1. vibeCheck reads whatever header sits at that
+            cell, so a saved setup keeps working when column names change between files.
+          </p>
+
+          <h4 class="settings-subhead">Address</h4>
+          <div id="default-columns" class="cell-grid"></div>
+
+          <div class="settings-actions">
+            <button id="save-column-mapping" class="primary-button is-active" type="submit">
+              Save header cells
+            </button>
+            <button id="clear-column-mapping" class="secondary-button" type="button">
+              Clear saved cells
+            </button>
+          </div>
+          <p id="column-settings-message" class="settings-message" aria-live="polite"></p>
+        </form>
+      </div>
+    </div>
+
+    <div
+      id="appearance-overlay"
+      class="welcome-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="appearance-dialog-title"
+      hidden
+    >
+      <div class="welcome-card settings-dialog-card">
+        <div class="settings-form">
+          <h3 id="appearance-dialog-title">Appearance and accessibility</h3>
+          <label for="theme-select">Theme</label>
+          <select id="theme-select" class="settings-select">
+            <option value="system">Match system</option>
+            <option value="light">Sunrise light</option>
+            <option value="dark">Pre-dawn dark</option>
+          </select>
+
+          <h4 class="settings-subhead">Accessibility</h4>
+          <label class="settings-toggle">
+            <input id="high-contrast" type="checkbox" />
+            <span><strong>Increase contrast</strong><small>Strengthen text and borders for readability.</small></span>
+          </label>
+          <label class="settings-toggle">
+            <input id="reduce-motion" type="checkbox" />
+            <span><strong>Reduce motion</strong><small>Turn off fade transitions between views.</small></span>
+          </label>
+        </div>
+      </div>
+    </div>
+
+
+    <script type="module" src="./renderer.js"></script>
+  </body>
+</html>
