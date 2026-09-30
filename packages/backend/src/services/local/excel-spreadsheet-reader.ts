@@ -21,6 +21,7 @@ import type {
 const goodFill = "FFDDF3DD";
 const badFill = "FFF6D6D6";
 const correctedFill = "FFFCE9C8";
+const neutralFill = "FFF2F2F2";
 
 /** Reads and updates Excel workbooks with ExcelJS so no custom spreadsheet parsing is required. */
 export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWriter {
@@ -72,7 +73,15 @@ export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWri
   ): Promise<void> {
     const sheet = await loadFirstSheet(filePath);
     const { columns } = options;
-    const wanted = [columns.standardized, columns.deliverability];
+    /* The USDA columns are added only when a check ran, so a validation-only
+       run exports exactly the columns it always did. */
+    const wanted = [
+      columns.standardized,
+      columns.deliverability,
+      ...(annotations.some((annotation) => annotation.rural !== undefined) ? [columns.rural] : []),
+      ...(annotations.some((annotation) => annotation.area !== undefined) ? [columns.area] : []),
+      ...(annotations.some((annotation) => annotation.ready !== undefined) ? [columns.ready] : []),
+    ];
 
     const { rowNumber: headerRowNumber, headers } = requireHeaderRow(sheet);
     const columnAt = new Map<string, number>();
@@ -100,6 +109,15 @@ export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWri
         setResultCell(row, columnAt, columns.standardized, annotation.standardizedAddress, correctedFill);
       }
       setResultCell(row, columnAt, columns.deliverability, annotation.deliverability, fillFor(annotation.deliverability));
+      if (annotation.rural !== undefined) {
+        setResultCell(row, columnAt, columns.rural, annotation.rural, fillFor(annotation.rural));
+      }
+      if (annotation.area !== undefined) {
+        setResultCell(row, columnAt, columns.area, annotation.area, fillFor(annotation.area));
+      }
+      if (annotation.ready !== undefined) {
+        setResultCell(row, columnAt, columns.ready, annotation.ready, fillFor(annotation.ready));
+      }
       row.commit();
     }
 
@@ -125,9 +143,15 @@ function setResultCell(
   }
 }
 
-/** Green for a deliverable verdict, red for an undeliverable one. */
+/** Green for a passing verdict, red for a failing one, neutral for "Not Verified". */
 function fillFor(value: string): string {
-  return value === "Invalid" ? badFill : goodFill;
+  if (value === "Invalid" || value === "Not Rural" || value === "Not Eligible" || value === "No") {
+    return badFill;
+  }
+  if (value === "Not Verified") {
+    return neutralFill;
+  }
+  return goodFill;
 }
 
 async function loadFirstSheet(filePath: string): Promise<ExcelJS.Worksheet> {

@@ -13,6 +13,9 @@ const directories: string[] = [];
 const resultColumns = {
   standardized: "Standardized Address",
   deliverability: "Address Checks",
+  rural: "USDA Rural",
+  area: "USDA Area Eligibility",
+  ready: "Ready to Ship",
 };
 
 afterEach(async () => {
@@ -332,5 +335,34 @@ describe("ExcelSpreadsheetReader", () => {
     expect(original.headers).not.toContain("Address Checks");
     const copy = await reader.readSummary(copyPath);
     expect(copy.headers).toContain("Address Checks");
+  });
+  test("annotateResults adds the USDA columns only when a check ran, color-coded by verdict", async () => {
+    const filePath = await createWorkbook();
+
+    const copyPath = await annotateToCopy(filePath, [
+      { rowNumber: 2, deliverability: "Valid", rural: "Rural", area: "In Area — Eligible", ready: "Yes" },
+      { rowNumber: 3, deliverability: "Valid", rural: "Not Verified", area: "Not Eligible", ready: "No" },
+    ]);
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(copyPath);
+    const sheet = workbook.worksheets[0]!;
+    const header = sheet.getRow(1).values as unknown[];
+    expect(header.slice(6)).toEqual([
+      "Standardized Address",
+      "Address Checks",
+      "USDA Rural",
+      "USDA Area Eligibility",
+      "Ready to Ship",
+    ]);
+    const fillOf = (row: number, column: number): string | undefined =>
+      (sheet.getRow(row).getCell(column).fill as ExcelJS.FillPattern | undefined)?.fgColor?.argb;
+    expect(sheet.getRow(2).getCell(8).value).toBe("Rural");
+    expect(fillOf(2, 8)).toBe("FFDDF3DD");
+    expect(sheet.getRow(2).getCell(10).value).toBe("Yes");
+    // "Not Verified" is neutral, a failing verdict is red.
+    expect(fillOf(3, 8)).toBe("FFF2F2F2");
+    expect(fillOf(3, 9)).toBe("FFF6D6D6");
+    expect(fillOf(3, 10)).toBe("FFF6D6D6");
   });
 });

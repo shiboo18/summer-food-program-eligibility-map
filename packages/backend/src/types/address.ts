@@ -9,10 +9,19 @@ export interface Address {
 
 export type AddressVerificationStatus = "verified" | "corrected" | "unverified";
 
+/** A coordinate Smarty returned for a verified address, with a 0–100 confidence score. */
+export interface VerifiedLocation {
+  readonly lat: number;
+  readonly lng: number;
+  readonly score: number;
+}
+
 export interface AddressVerificationResult {
   readonly status: AddressVerificationStatus;
   readonly inputAddress: Address;
   readonly normalizedAddress?: Address;
+  /** Smarty's rooftop/ZIP coordinate for the address, when it returned one. */
+  readonly location?: VerifiedLocation;
   readonly messages: readonly string[];
 }
 

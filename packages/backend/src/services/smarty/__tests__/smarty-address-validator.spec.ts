@@ -70,6 +70,23 @@ describe("SmartyAddressValidator", () => {
     expect(result?.normalizedAddress?.postalCode).toBe("78701-1234");
   });
 
+  test("includes Smarty's coordinate and a precision-based score", async () => {
+    const send = vi.fn(async (batch: Batch): Promise<void> => {
+      (batch.getByIndex(0) as Lookup).result.push(
+        new SmartySDK.usStreet.Candidate({
+          delivery_line_1: "1 MAIN STREET",
+          components: { city_name: "AUSTIN", state_abbreviation: "TX", zipcode: "78701" },
+          metadata: { latitude: 30.27, longitude: -97.74, precision: "Zip9" },
+        }),
+      );
+    });
+    const validator = new SmartyAddressValidator(credentials, () => ({ send }));
+
+    const [result] = await validator.validate([address("1 Main St")]);
+
+    expect(result?.location).toEqual({ lat: 30.27, lng: -97.74, score: 85 });
+  });
+
   test("sends one batch and returns a result per input, in order", async () => {
     const send = vi.fn(async (batch: Batch): Promise<void> => {
       (batch.getByIndex(0) as Lookup).result.push(candidate("1 MAIN STREET"));

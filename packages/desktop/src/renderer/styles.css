@@ -655,6 +655,7 @@ p {
 }
 
 .mapping-section,
+.checks-section,
 .results-section {
   margin-bottom: 22px;
   padding: clamp(20px, 3vw, 30px);
@@ -1174,5 +1175,89 @@ html[data-motion="reduced"] *::after {
 @media (max-width: 620px) {
   .results-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* USDA checks step */
+.checks-list {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 18px;
+}
+
+/* Per-row USDA verdicts under the stat tiles */
+.results-body:empty {
+  display: none;
+}
+
+.results-table {
+  width: 100%;
+  margin: 0 0 18px;
+  border-collapse: collapse;
+  font-size: 0.8rem;
+}
+
+.results-table th,
+.results-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.results-table th {
+  font-size: 0.68rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+
+.results-table tr[data-state="warning"] td {
+  color: var(--text-soft);
+}
+
+/* Column definitions panel */
+.results-legend {
+  margin: 14px 0 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+  padding: 10px 14px;
+}
+
+.results-legend > summary {
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.results-legend-list {
+  margin: 12px 0 2px;
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 6px 16px;
+}
+
+.results-legend-list dt {
+  font-weight: 700;
+  font-size: 0.78rem;
+  color: var(--text);
+}
+
+.results-legend-list dd {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+@media (max-width: 620px) {
+  .results-legend-list {
+    grid-template-columns: 1fr;
+    gap: 2px 0;
+  }
+  .results-legend-list dd {
+    margin-bottom: 8px;
   }
 }

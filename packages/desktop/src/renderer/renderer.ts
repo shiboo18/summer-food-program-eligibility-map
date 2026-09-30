@@ -1,6 +1,8 @@
 import type {
   ColumnMapping,
   CredentialStatus,
+  EligibilityChecks,
+  EligibilityReport,
   Preferences,
   RunProgress,
   ValidationReport,
@@ -19,6 +21,13 @@ import {
 import { defaultPreferences } from "../../../backend/dist/types/preferences.js";
 import { getRequiredElement } from "./dom.js";
 import { createBackgroundQueue } from "./workflow/background-queue.js";
+import {
+  canRunChecks,
+  resolveCheckControls,
+  selectedEligibilityChecks,
+  type EligibilityCheckSelection,
+} from "./workflow/eligibility-checks.js";
+import { areaLabel, isReady, readyLabel, ruralLabel, verifyLabel } from "./workflow/eligibility-format.js";
 import { createSettingsPanel } from "./settings/settings-panel.js";
 import { singleFlight } from "./workflow/single-flight.js";
 import { workflowSteps } from "./workflow/steps/index.js";
@@ -75,9 +84,17 @@ const excelFileStatus = getRequiredElement<HTMLElement>("#excel-file-status");
 const excelFileMessage = getRequiredElement<HTMLElement>("#excel-file-message");
 const excelFileSpinner = getRequiredElement<HTMLElement>("#excel-file-spinner");
 const mappingForm = getRequiredElement<HTMLFormElement>("#mapping-form");
-const mappingSection = getRequiredElement<HTMLElement>("#mapping-section");
 const formMessage = getRequiredElement<HTMLElement>("#form-message");
 const resultsStats = getRequiredElement<HTMLElement>("#results-stats");
+const resultsBody = getRequiredElement<HTMLElement>("#results-body");
+const checksSection = getRequiredElement<HTMLElement>("#checks-section");
+const checkInputs = {
+  addressValidation: getRequiredElement<HTMLInputElement>("#check-address-validation"),
+  rural: getRequiredElement<HTMLInputElement>("#check-rural"),
+  area: getRequiredElement<HTMLInputElement>("#check-area"),
+};
+const runChecksButton = getRequiredElement<HTMLButtonElement>("#run-checks");
+const checksMessage = getRequiredElement<HTMLElement>("#checks-message");
 const processingSection = getRequiredElement<HTMLElement>("#processing-section");
 const processingBar = getRequiredElement<HTMLElement>("#processing-bar");
 const processingBarFill = getRequiredElement<HTMLElement>("#processing-bar-fill");
@@ -92,10 +109,12 @@ const mappingSelects = Object.fromEntries(
   addressFields.map(({ field }) => [field, getRequiredElement<HTMLSelectElement>(`#map-${field}`)]),
 ) as Record<AddressField, HTMLSelectElement>;
 
-type Stage = "upload" | "map-columns" | "results";
+type Stage = "upload" | "map-columns" | "checks" | "results";
 let stage: Stage = "upload";
 let selectedSpreadsheet: SpreadsheetSelection | null = null;
 let lastReport: ValidationReport | null = null;
+/** The USDA checks the last run made, so the export message can name their columns. */
+let lastChecks: EligibilityChecks | null = null;
 
 const workflowStepList = getRequiredElement<HTMLOListElement>("#workflow-steps");
 
@@ -194,6 +213,9 @@ function goToStage(next: Stage): void {
      it reflects cells edited in the dialog and a file loaded since. */
   if (next === "map-columns" && selectedSpreadsheet !== null) {
     renderMapping(selectedSpreadsheet);
+  }
+  if (next === "checks") {
+    syncCheckControls();
   }
   stage = next;
   renderWorkflow();
@@ -323,7 +345,8 @@ function currentMapping(): ColumnMapping {
 }
 
 /**
- * Runs validation from the mapping screen, saving the chosen columns behind it.
+ * Moves from the mapping screen to the checks screen, saving the chosen columns
+ * behind it.
  *
  * The cells are read from the selects now and written in the background, so the
  * store is never what the partner waits on. Nothing later reads the saved cells —
@@ -341,18 +364,50 @@ function finishMapColumns(): void {
   const chosen = currentMapping();
   const { headers, headerRowNumber } = selectedSpreadsheet;
   savePreferences(() => ({ columnMapping: cachedColumnMapping(chosen, headers, headerRowNumber) }));
-  void runValidation();
+  goToStage("checks");
 }
-
-/*
- * The mapping is submitted by pressing Enter or the button, either of which can
- * fire while a run is already going, which would pass a second run through.
- */
-const runValidation = singleFlight(performValidation);
 
 mappingForm.addEventListener("submit", (event): void => {
   event.preventDefault();
   finishMapColumns();
+});
+
+/* USDA eligibility checks (Module 3). */
+function currentCheckSelection(): EligibilityCheckSelection {
+  return {
+    addressValidation: checkInputs.addressValidation.checked,
+    rural: checkInputs.rural.checked,
+    area: checkInputs.area.checked,
+  };
+}
+
+/** Keeps the USDA checkboxes and the run button in step with the selection rule. */
+function syncCheckControls(): void {
+  const selection = currentCheckSelection();
+  const controls = resolveCheckControls(selection);
+  checkInputs.rural.disabled = !controls.ruralEnabled;
+  checkInputs.area.disabled = !controls.areaEnabled;
+  if (!controls.ruralEnabled) {
+    checkInputs.rural.checked = false;
+  }
+  if (!controls.areaEnabled) {
+    checkInputs.area.checked = false;
+  }
+  runChecksButton.disabled = !canRunChecks(currentCheckSelection());
+}
+
+for (const input of [checkInputs.addressValidation, checkInputs.rural, checkInputs.area]) {
+  input.addEventListener("change", syncCheckControls);
+}
+
+/*
+ * The run button can be pressed again while a run is already going, which would
+ * pass a second run through.
+ */
+const runChecks = singleFlight(performRun);
+
+runChecksButton.addEventListener("click", (): void => {
+  void runChecks();
 });
 
 /*
@@ -389,15 +444,76 @@ function setUiFrozen(frozen: boolean): void {
   workflowSidebar.toggleAttribute("inert", frozen);
 }
 
-function renderValidationResults(report: ValidationReport): void {
+function renderRunResults(report: ValidationReport, eligibility: EligibilityReport | null): void {
   resetExportButton();
 
-  renderResultsStats([
+  const stats: ResultStat[] = [
     { value: report.total, label: "Rows checked", tone: "neutral" },
     { value: report.verified, label: "Verified", tone: "good" },
     { value: report.corrected, label: "Corrected", tone: "good" },
     { value: report.failures.length, label: "Needs review", tone: "neutral" },
-  ]);
+  ];
+  if (eligibility !== null) {
+    stats.push(
+      { value: eligibility.ruralCount, label: "USDA rural", tone: "good" },
+      { value: eligibility.areaEligibleCount, label: "Area eligible", tone: "good" },
+      { value: eligibility.needingVerification, label: "Location unsure", tone: "neutral" },
+      { value: countReady(report, eligibility), label: "Ready to ship", tone: "good" },
+    );
+  }
+  renderResultsStats(stats);
+  renderEligibilityRows(report, eligibility);
+}
+
+/** Rows that are deliverable, confidently located, rural, and area-eligible. */
+function countReady(report: ValidationReport, eligibility: EligibilityReport): number {
+  const failedRows = new Set(report.failures.map((failure) => failure.rowNumber));
+  return eligibility.rows.filter((result) => isReady(result, !failedRows.has(result.rowNumber))).length;
+}
+
+/** One row per address with its USDA verdicts; nothing when no USDA check was chosen. */
+function renderEligibilityRows(report: ValidationReport, eligibility: EligibilityReport | null): void {
+  resultsBody.replaceChildren();
+  if (eligibility === null || eligibility.rows.length === 0) {
+    return;
+  }
+  const failureReasons = new Set(report.failures.map((failure) => failure.rowNumber));
+
+  const table = document.createElement("table");
+  table.className = "results-table";
+  const head = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  for (const heading of ["Row", "Standardized address", "Deliv.", "Rural", "Area", "Ready", "Verify?"]) {
+    const cell = document.createElement("th");
+    cell.textContent = heading;
+    headRow.append(cell);
+  }
+  head.append(headRow);
+  const body = document.createElement("tbody");
+  for (const result of eligibility.rows) {
+    const row = document.createElement("tr");
+    if (result.needsVerification) {
+      row.dataset.state = "warning";
+    }
+    const deliverable = !failureReasons.has(result.rowNumber);
+    const cells = [
+      String(result.rowNumber),
+      result.matchedAddress ?? "—",
+      deliverable ? "Yes" : "No",
+      ruralLabel(result.rural?.designation),
+      areaLabel(result.area?.eligibility),
+      readyLabel(result, deliverable),
+      verifyLabel(result),
+    ];
+    for (const value of cells) {
+      const cell = document.createElement("td");
+      cell.textContent = value;
+      row.append(cell);
+    }
+    body.append(row);
+  }
+  table.append(head, body);
+  resultsBody.append(table);
 }
 
 interface ResultStat {
@@ -458,10 +574,14 @@ bridge.run.onProgress((progress: RunProgress): void => {
   }
 });
 
-async function performValidation(): Promise<void> {
+/**
+ * Runs address validation, then whichever USDA checks were ticked. Validation
+ * goes first because it produces the coordinate the USDA checks are made against.
+ */
+async function performRun(): Promise<void> {
   if (selectedSpreadsheet === null) {
-    formMessage.textContent = "Upload an Excel file first.";
-    formMessage.dataset.state = "error";
+    checksMessage.textContent = "Upload an Excel file first.";
+    checksMessage.dataset.state = "error";
     return;
   }
 
@@ -469,36 +589,46 @@ async function performValidation(): Promise<void> {
   try {
     credentialStatus = await bridge.settings.getStatus();
   } catch (error: unknown) {
-    formMessage.textContent = friendlyMessage(error, "Unable to read credential status.");
-    formMessage.dataset.state = "error";
+    checksMessage.textContent = friendlyMessage(error, "Unable to read credential status.");
+    checksMessage.dataset.state = "error";
     return;
   }
   if (!credentialStatus.smartyAuthId || !credentialStatus.smartyAuthToken) {
-    window.alert("Set Smarty AUTH_ID and AUTH_TOKEN in Settings before checking addresses.");
+    window.alert("Set Smarty AUTH_ID and AUTH_TOKEN in Settings before running checks.");
     showSettings(true);
     settingsPanel.openCredentials();
     return;
   }
 
-  formMessage.textContent = "";
-  formMessage.dataset.state = "idle";
+  const checks = selectedEligibilityChecks(currentCheckSelection());
+  const mapping = currentMapping();
+  checksMessage.textContent = "";
+  checksMessage.dataset.state = "idle";
   startRunProgress(selectedSpreadsheet.rowCount);
   processingStatus.textContent = "Checking each address with Smarty.";
   processingPrivacy.textContent = "Only the address fields leave your computer.";
-  mappingSection.hidden = true;
+  checksSection.hidden = true;
   processingSection.hidden = false;
   setUiFrozen(true);
   try {
-    const report = await bridge.spreadsheet.validate(selectedSpreadsheet.fileName, currentMapping());
+    const report = await bridge.spreadsheet.validate(selectedSpreadsheet.fileName, mapping);
+    let eligibility: EligibilityReport | null = null;
+    if (checks.rural || checks.area) {
+      processingStatus.textContent = "Checking USDA eligibility for each located address.";
+      processingPrivacy.textContent =
+        "Some addresses are also sent to Esri to find their exact location. Esri makes ArcGIS, the mapping software USDA and many governments use.";
+      eligibility = await bridge.eligibility.check(selectedSpreadsheet.fileName, mapping, checks);
+    }
     lastReport = report;
-    renderValidationResults(report);
+    lastChecks = eligibility === null ? null : checks;
+    renderRunResults(report, eligibility);
     processingSection.hidden = true;
     goToStage("results");
   } catch (error: unknown) {
     processingSection.hidden = true;
     renderWorkflow();
-    formMessage.textContent = friendlyMessage(error, "The addresses could not be checked.");
-    formMessage.dataset.state = "error";
+    checksMessage.textContent = friendlyMessage(error, "The checks could not be run.");
+    checksMessage.dataset.state = "error";
   } finally {
     setUiFrozen(false);
   }
@@ -553,6 +683,9 @@ function renderExportMessage(filePath: string): void {
   const added: readonly { readonly label: string; readonly note?: string }[] = [
     { label: "Standardized Address", note: "corrected rows only" },
     { label: "Address Checks" },
+    ...(lastChecks?.rural === true ? [{ label: "USDA Rural" }] : []),
+    ...(lastChecks?.area === true ? [{ label: "USDA Area Eligibility" }] : []),
+    ...(lastChecks !== null && (lastChecks.rural || lastChecks.area) ? [{ label: "Ready to Ship" }] : []),
   ];
 
   const lead = document.createElement("p");

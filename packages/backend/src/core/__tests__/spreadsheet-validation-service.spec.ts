@@ -43,10 +43,16 @@ const validator: AddressValidator = {
   validate: async (addresses) =>
     addresses.map((inputAddress, index) => {
       if (index === 0) {
-        return { status: "verified", inputAddress, messages: [] };
+        return { status: "verified", inputAddress, messages: [], location: { lat: 30.27, lng: -97.74, score: 100 } };
       }
       if (index === 1) {
-        return { status: "corrected", inputAddress, normalizedAddress: correctedAddress, messages: [] };
+        return {
+          status: "corrected",
+          inputAddress,
+          normalizedAddress: correctedAddress,
+          messages: [],
+          location: { lat: 30.28, lng: -97.75, score: 85 },
+        };
       }
       return { status: "unverified", inputAddress, messages: ["Smarty could not verify this address."] };
     }),
@@ -125,5 +131,21 @@ describe("SpreadsheetValidationService", () => {
     /* Three rows went to Smarty and one was skipped while reading, so the phase
        ends on the sheet's four data rows rather than short of them. */
     expect(reported).toEqual([4]);
+  });
+
+  test("returns Smarty geocodes per row for verified and corrected rows only", async () => {
+    const service = new SpreadsheetValidationService(createSpreadsheet(), validator);
+
+    const { geocodes } = await service.validate({ filePath: "/tmp/a.xlsx", mapping, fileName: "a.xlsx" });
+
+    expect([...geocodes.keys()].sort((a, b) => a - b)).toEqual([2, 3]);
+    expect(geocodes.get(2)).toEqual({
+      point: { lat: 30.27, lng: -97.74 },
+      score: 100,
+      matchedAddress: "1 Verified St, Austin, TX 78701",
+      source: "smarty",
+    });
+    expect(geocodes.get(3)?.source).toBe("smarty");
+    expect(geocodes.has(4)).toBe(false);
   });
 });

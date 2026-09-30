@@ -128,11 +128,47 @@
 
               <div class="form-actions mapping-actions">
                 <button id="validate-addresses" class="primary-button is-active" type="submit">
-                  Check addresses
+                  Next: choose checks
                 </button>
                 <p id="form-message" class="form-message" aria-live="polite"></p>
               </div>
             </form>
+          </section>
+
+          <section id="checks-section" class="checks-section" aria-labelledby="intro-title" hidden>
+            <div class="checks-list">
+              <label class="settings-toggle">
+                <input id="check-address-validation" type="checkbox" checked disabled />
+                <span
+                  ><strong>Address validation &amp; deliverability (required)</strong>
+                  <small>Confirms each address and produces its location. Uses your Smarty account.</small></span
+                >
+              </label>
+              <label class="settings-toggle">
+                <input id="check-rural" type="checkbox" />
+                <span
+                  ><strong>USDA rural eligibility</strong>
+                  <small>Checks whether the address falls in a USDA-designated rural area. Checked online against USDA data.</small></span
+                >
+              </label>
+              <label class="settings-toggle">
+                <input id="check-area" type="checkbox" />
+                <span
+                  ><strong>USDA area eligibility</strong>
+                  <small
+                    >Checks area eligibility by census geography (in zone / with approval / out of zone). Checked
+                    online against USDA data.</small
+                  ></span
+                >
+              </label>
+            </div>
+            <div class="form-actions">
+              <button id="run-checks" class="primary-button is-active" type="button">
+                <span id="run-checks-spinner" class="loading-spinner" aria-hidden="true" hidden></span>
+                <span id="run-checks-label">Run checks</span>
+              </button>
+              <p id="checks-message" class="form-message" aria-live="polite"></p>
+            </div>
           </section>
 
           <section id="processing-section" class="processing-section" aria-labelledby="processing-title" hidden>
@@ -159,6 +195,19 @@
 
           <section id="results-section" class="results-section" aria-labelledby="intro-title" hidden>
             <div id="results-stats" class="results-stats" aria-live="polite"></div>
+            <div id="results-body" class="results-body"></div>
+            <details class="results-legend">
+              <summary>What these columns mean</summary>
+              <dl class="results-legend-list">
+                <dt>Row</dt><dd>The row number in your spreadsheet.</dd>
+                <dt>Standardized address</dt><dd>The matched, cleaned-up address (USPS-standardized when deliverable).</dd>
+                <dt>Deliv.</dt><dd>Deliverable — USPS confirms mail is delivered there. "No" means it couldn't be confirmed as mailable (common for rural addresses).</dd>
+                <dt>Rural</dt><dd>The address is in a USDA-designated rural area.</dd>
+                <dt>Area</dt><dd>USDA area eligibility: In zone / In zone (with approval) / Out of zone.</dd>
+                <dt>Ready</dt><dd>Deliverable, confidently located, rural, and area-eligible — good to ship.</dd>
+                <dt>Verify?</dt><dd>"Yes" means the location is approximate — double-check this row before relying on its USDA result.</dd>
+              </dl>
+            </details>
             <div class="form-actions">
               <button id="download-results" class="primary-button is-active" type="button">
                 <span id="download-spinner" class="loading-spinner" aria-hidden="true" hidden></span>

@@ -6,6 +6,8 @@ import type {
   ColumnMapping,
   CredentialInput,
   CredentialStatus,
+  EligibilityChecks,
+  EligibilityReport,
   Preferences,
   RunProgress,
   ValidationReport,
@@ -53,6 +55,10 @@ contextBridge.exposeInMainWorld(
         ipcRenderer.on("run:progress", handler);
         return () => ipcRenderer.removeListener("run:progress", handler);
       },
+    }),
+    eligibility: Object.freeze({
+      check: (fileName: string, mapping: ColumnMapping, checks: EligibilityChecks) =>
+        ipcRenderer.invoke("eligibility:check", { fileName, mapping, checks }) as Promise<EligibilityReport>,
     }),
     settings: Object.freeze({
       getStatus: () => ipcRenderer.invoke("settings:get-status") as Promise<CredentialStatus>,
