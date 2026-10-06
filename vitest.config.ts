@@ -5,7 +5,7 @@ export default defineConfig({
     exclude: [...configDefaults.exclude, "**/build/**", "**/dist/**"],
     silent: "passed-only",
     reporters: ["default", "junit"],
-    outputFile: "build/brazil-unit-tests/TESTS-TestSuites.xml",
+    outputFile: "build/unit-tests/TESTS-TestSuites.xml",
     coverage: {
       /*
        * The paths where a silent mistake reaches a partner's data: the checks
@@ -28,7 +28,7 @@ export default defineConfig({
       thresholds: { statements: 50, branches: 50, functions: 50, lines: 50 },
       skipFull: true,
       reporter: ["text-summary", "html", "cobertura"],
-      reportsDirectory: "build/brazil-documentation/coverage",
+      reportsDirectory: "build/coverage",
     },
   },
 });

@@ -1,30 +1,40 @@
 # vibeCheck
 
-vibeCheck is an Electron and TypeScript desktop app for a sponsor to verify beneficiary
-addresses with Smarty. The first-run education flow is page-based, and the
-main screen accepts validated Excel workbook selections.
+vibeCheck is an Electron and TypeScript desktop app for a summer-meal sponsor to
+check beneficiary addresses in an Excel workbook: it verifies each address with
+Smarty, then checks USDA rural designation and area eligibility against the
+public USDA and ArcGIS maps. Results are written to a copy of the workbook; the
+original is never changed.
 
 ## Structure
 
 - `packages/desktop`: Electron main process, preload, renderer, and UI helpers.
-- `packages/backend`: Smarty validation, encrypted credentials, and preferences.
+- `packages/backend`: Smarty validation, USDA eligibility checks, encrypted
+  credentials, and preferences.
 
 ## Commands
 
+Requires Node 24 or later.
+
 ```bash
-# Build and test
-brazil-build release
+# Install dependencies
+npm ci
+
+# Build, then run the unit tests and type-check the specs
+npm run build
+npm test
+npm run typecheck:tests
 
 # Build and open the app
 scripts/run-app.sh
 
 # Verify Electron startup without opening a window
-brazil-build run smoke
+npm run smoke
 ```
 
 Address input remains in memory. Smarty credentials are stored with operating-
-system encryption. Theme, accessibility, and first-run preferences are stored
-in Electron's application data directory.
+system encryption. Theme, accessibility, and column-mapping preferences are
+stored in Electron's application data directory.
 
 ## Packaging
 
@@ -38,8 +48,8 @@ electron-builder only packages already-compiled output; it does not run the
 TypeScript build or a dependency install. Prepare the tree first:
 
 ```bash
-# 1. Populate the hoisted node_modules from the internal registry
-brazil-build install
+# 1. Populate the hoisted node_modules
+npm ci
 
 # 2. Compile: tsc -b + copy-static.mjs -> packages/*/dist
 #    (electron-builder 26.3.6 is already a root devDependency)
@@ -64,7 +74,7 @@ the required production dependencies (for example the Smarty SDK) from the root
 Artifacts are unsigned by default so local builds are self-contained and
 deterministic. macOS uses `identity: null` (Gatekeeper warns on first launch)
 and Windows sets `signAndEditExecutable: false` (SmartScreen warns). To sign
-later, add a macOS Developer ID (or internal) identity with the matching
+later, add a macOS Developer ID identity with the matching
 hardened-runtime and notarization settings, or supply a Windows certificate via
 the `CSC_LINK` and `CSC_KEY_PASSWORD` environment variables. No placeholder
 signing or notarization values are committed.

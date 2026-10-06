@@ -1,5 +1,5 @@
 {
-  "name": "@amzn/share-our-strengths-app",
+  "name": "share-our-strengths-app",
   "productName": "vibeCheck",
   "version": "0.1.0",
   "description": "vibeCheck desktop address validation tool.",
@@ -7,9 +7,9 @@
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
-    "url": "ssh://git.amazon.com/pkg/ShareOurStrengthsApp"
+    "url": "https://github.com/shiboo18/summer-food-program-eligibility-map.git"
   },
-  "homepage": "https://code.amazon.com/packages/ShareOurStrengthsApp",
+  "homepage": "https://github.com/shiboo18/summer-food-program-eligibility-map",
   "type": "module",
   "main": "./packages/desktop/dist/main/main.js",
   "workspaces": [
@@ -30,7 +30,6 @@
     "typecheck:tests": "tsc -b && tsc -p packages/backend/tsconfig.spec.json && tsc -p packages/desktop/tsconfig.spec.json",
     "prepublishOnly": "npm run build && npm run test",
     "test": "vitest run --coverage",
-    "posttest": "generate-coverage-data --language typescript",
     "package": "npm run package:prepare && electron-builder --mac --win --config electron-builder.yml && npm run package:prune",
     "package:prepare": "npm run build && node scripts/fix-smarty-tslib.mjs",
     "package:prune": "rm -f build/electron/*-x64-setup.exe build/electron/*-x64-setup.exe.blockmap build/electron/*-arm64-setup.exe build/electron/*-arm64-setup.exe.blockmap",
@@ -43,9 +42,6 @@
     "packages/desktop/dist/",
     "packages/desktop/package.json"
   ],
-  "npm-pretty-much": {
-    "runTest": "never"
-  },
   "dependencies": {
     "exceljs": "4.4.0",
     "ky": "2.1.0",
@@ -53,7 +49,6 @@
     "tslib": "2.8.1"
   },
   "devDependencies": {
-    "@amzn/brazil": "^2.2.3",
     "@tsconfig/node24": "^24.0.4",
     "@types/node": "24.13.4",
     "@vitest/coverage-v8": "^4.1.2",
