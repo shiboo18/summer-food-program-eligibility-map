@@ -35,6 +35,9 @@ declare global {
         reveal(fileName: string): Promise<void>;
         validate(fileName: string, mapping: ColumnMapping): Promise<ValidationReport>;
       };
+      readonly eligibility: {
+        check(fileName: string, mapping: ColumnMapping, checks: EligibilityChecks): Promise<EligibilityReport>;
+      };
       readonly results: {
         export(fileName: string): Promise<ExportResult>;
         /** Reveals the exported copy in the OS file manager. */
@@ -43,9 +46,6 @@ declare global {
       readonly run: {
         /** Subscribes to a run's progress. Returns the unsubscribe function. */
         onProgress(listener: (progress: RunProgress) => void): () => void;
-      };
-      readonly eligibility: {
-        check(fileName: string, mapping: ColumnMapping, checks: EligibilityChecks): Promise<EligibilityReport>;
       };
       readonly settings: {
         getStatus(): Promise<CredentialStatus>;

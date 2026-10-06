@@ -1,8 +1,7 @@
 import type { Address } from "../../types/address.js";
-import type { Geocoder, JsonHttpClient } from "../../contracts.js";
-import type { GeocodeResult } from "../../types/eligibility.js";
-import { ESRI_GEOCODER_URL } from "../../config/constants.js";
-import { FetchJsonHttpClient } from "../http/fetch-json-http-client.js";
+import type { Geocoder, HttpGetClient } from "../../contracts.js";
+import type { GeocodeResult, LocationPrecision } from "../../types/eligibility.js";
+import { ESRI_FIND_CANDIDATES_PATH } from "../../config/constants.js";
 
 /**
  * Resolves addresses with the free, anonymous Esri World Geocoder. Returns the
@@ -10,14 +9,14 @@ import { FetchJsonHttpClient } from "../http/fetch-json-http-client.js";
  * pipeline uses as its location-confidence signal.
  */
 export class EsriGeocoder implements Geocoder {
-  public constructor(private readonly http: JsonHttpClient = new FetchJsonHttpClient()) {}
+  public constructor(private readonly http: HttpGetClient) {}
 
   public async geocode(address: Address): Promise<GeocodeResult | undefined> {
     let payload: unknown;
     try {
-      payload = await this.http.getJson(ESRI_GEOCODER_URL, {
+      payload = await this.http.get(ESRI_FIND_CANDIDATES_PATH, {
         singleLine: toSingleLine(address),
-        outFields: "Match_addr",
+        outFields: "Match_addr,Addr_type",
         maxLocations: "1",
         f: "json",
       });
@@ -34,8 +33,8 @@ export class EsriGeocoder implements Geocoder {
     return {
       point: { lat: candidate.y, lng: candidate.x },
       score: candidate.score,
+      precision: candidate.precision,
       matchedAddress: candidate.address,
-      source: "esri",
     };
   }
 }
@@ -50,6 +49,36 @@ interface EsriCandidate {
   readonly y: number;
   readonly score: number;
   readonly address: string;
+  readonly precision: LocationPrecision;
+}
+
+/**
+ * Esri's `Addr_type`, which says what kind of thing the point is on. Anything not
+ * listed is treated as unknown so a class we have not accounted for is never
+ * trusted by accident.
+ */
+function toPrecision(addressType: unknown): LocationPrecision {
+  switch (typeof addressType === "string" ? addressType : "") {
+    case "PointAddress":
+    case "Subaddress":
+      return "rooftop";
+    case "StreetAddress":
+    case "StreetAddressExt":
+    case "StreetInt":
+      return "street";
+    case "Postal":
+    case "PostalExt":
+    case "PostalLoc":
+      return "postal";
+    /* A street centroid with no house number, and town-level hits, are only as
+       good as a locality for block-group purposes. */
+    case "StreetName":
+    case "Locality":
+    case "POI":
+      return "locality";
+    default:
+      return "unknown";
+  }
 }
 
 function firstCandidate(payload: unknown): EsriCandidate | undefined {
@@ -78,6 +107,7 @@ function firstCandidate(payload: unknown): EsriCandidate | undefined {
     y: location.y,
     score: typeof candidate.score === "number" ? candidate.score : 0,
     address: typeof candidate.address === "string" ? candidate.address : "",
+    precision: toPrecision(asRecord(candidate.attributes)?.Addr_type),
   };
 }
 

@@ -46,12 +46,12 @@ describe("PreferencesStore", () => {
     const filePath = await createStorePath();
     await writeFile(filePath, "{oops", "utf8");
 
-    const updated = await new PreferencesStore(filePath).update({ columnMapping: { line1: "A1" } });
+    const updated = await new PreferencesStore(filePath).update({ checkSelection: { rural: true, area: false } });
 
-    expect(updated.columnMapping).toEqual({ line1: "A1" });
+    expect(updated.checkSelection).toEqual({ rural: true, area: false });
     await expect(new PreferencesStore(filePath).get()).resolves.toEqual({
       ...defaultPreferences,
-      columnMapping: { line1: "A1" },
+      checkSelection: { rural: true, area: false },
     });
   });
 
@@ -122,16 +122,30 @@ describe("PreferencesStore", () => {
     });
   });
 
+  test("remembers the optional USDA checks", async () => {    const store = await createStore();
+
+    const updated = await store.update({ checkSelection: { rural: true, area: false } });
+
+    expect(updated.checkSelection).toEqual({ rural: true, area: false });
+    await expect(store.get()).resolves.toMatchObject({ checkSelection: { rural: true, area: false } });
+  });
+
+  test("falls back to defaults for non-boolean check values", async () => {
+    const store = await createStore();
+
+    const updated = await store.update({ checkSelection: { rural: "yes", area: true } as never });
+
+    expect(updated.checkSelection).toEqual({ rural: false, area: true });
+  });
+
   test("updating one cached preference leaves the other intact", async () => {
     const store = await createStore();
     await store.update({ columnMapping: { line1: "A1" } });
 
-    const updated = await store.update({
-      accessibility: { theme: "dark", highContrast: false, reduceMotion: false },
-    });
+    const updated = await store.update({ checkSelection: { rural: true, area: true } });
 
     expect(updated.columnMapping).toEqual({ line1: "A1" });
-    expect(updated.accessibility).toEqual({ theme: "dark", highContrast: false, reduceMotion: false });
+    expect(updated.checkSelection).toEqual({ rural: true, area: true });
   });
 
   test("ignores an unknown theme value", async () => {

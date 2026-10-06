@@ -2,6 +2,7 @@ import SmartySDK from "smartystreets-javascript-sdk";
 
 import type { AddressValidator } from "../../contracts.js";
 import type { Address, AddressVerificationResult } from "../../types/address.js";
+import type { LocationPrecision } from "../../types/eligibility.js";
 import type { ProgressReporter } from "../../types/progress.js";
 
 type SmartyBatch = InstanceType<typeof SmartySDK.core.Batch>;
@@ -124,15 +125,37 @@ function toResult(address: Address, lookup: SmartyLookup | undefined): AddressVe
 
 function candidateToLocation(
   candidate: InstanceType<typeof SmartySDK.usStreet.Candidate>,
-): { lat: number; lng: number; score: number } | undefined {
+): { lat: number; lng: number; score: number; precision: LocationPrecision } | undefined {
   const { latitude, longitude, precision } = candidate.metadata;
   if (latitude === undefined || longitude === undefined) {
     return undefined;
   }
-  // Only a rooftop match is high confidence; coarser (ZIP/block) matches score
-  // below the gate so the eligibility pipeline flags them for verification.
-  const score = precision !== undefined && precision.toLowerCase().includes("rooftop") ? 100 : 85;
-  return { lat: latitude, lng: longitude, score };
+  /* A Smarty candidate IS the USPS address, so the match itself is not in doubt
+     and the score is full. What varies is how tightly the point is placed, which
+     the precision class carries. */
+  return { lat: latitude, lng: longitude, score: 100, precision: toPrecision(precision) };
+}
+
+/**
+ * Smarty's `precision` values, coarsest to finest: Unknown, Zip5 through Zip9,
+ * Street, Parcel, Rooftop. Rooftop and Parcel sit on the property; Street is
+ * interpolated along the frontage; every Zip level is a centroid.
+ */
+function toPrecision(precision: string | undefined): LocationPrecision {
+  if (precision === undefined) {
+    return "unknown";
+  }
+  const value = precision.toLowerCase();
+  if (value.includes("rooftop") || value.includes("parcel")) {
+    return "rooftop";
+  }
+  if (value.includes("street")) {
+    return "street";
+  }
+  if (value.startsWith("zip")) {
+    return "postal";
+  }
+  return "unknown";
 }
 
 function createLookup(address: Address): SmartyLookup {

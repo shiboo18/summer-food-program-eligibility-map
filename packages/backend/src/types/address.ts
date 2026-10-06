@@ -1,3 +1,5 @@
+import type { LocationPrecision } from "./eligibility.js";
+
 export interface Address {
   readonly line1: string;
   readonly line2?: string;
@@ -9,11 +11,15 @@ export interface Address {
 
 export type AddressVerificationStatus = "verified" | "corrected" | "unverified";
 
-/** A coordinate Smarty returned for a verified address, with a 0–100 confidence score. */
+/**
+ * A coordinate Smarty returned for a verified address. The score says how well
+ * the address matched; the precision says how tightly the point is placed.
+ */
 export interface VerifiedLocation {
   readonly lat: number;
   readonly lng: number;
   readonly score: number;
+  readonly precision: LocationPrecision;
 }
 
 export interface AddressVerificationResult {

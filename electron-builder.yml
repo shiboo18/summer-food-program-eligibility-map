@@ -5,13 +5,13 @@
 # here, and production dependencies are hoisted into the root node_modules.
 #
 # Prerequisites:
-#   brazil-build install   # populate hoisted node_modules from the registry
+#   npm ci                 # populate the hoisted node_modules
 # The package scripts compile first, so run one of:
 #   npm run package        # macOS and Windows together
 #   npm run package:mac    # dmg + zip, arm64 and x64
 #   npm run package:win    # nsis installer, x64
 
-appId: com.amazon.vibecheck
+appId: io.github.shiboo18.vibecheck
 productName: vibeCheck
 
 directories:

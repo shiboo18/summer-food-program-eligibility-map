@@ -1,4 +1,4 @@
-import type { EligibilityChecks } from "../../../../backend/dist/index.js";
+import type { EligibilityChecks } from "../types/eligibility.js";
 
 /** The state of the four checkboxes on the Checks step. */
 export interface EligibilityCheckSelection {

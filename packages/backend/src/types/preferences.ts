@@ -19,6 +19,15 @@ export const mappingFields = [
  */
 export type CachedColumnMapping = Readonly<Partial<Record<(typeof mappingFields)[number], string>>>;
 
+/**
+ * The optional USDA checks the user last ran. Address validation is always
+ * required, so it is not cached: it cannot be turned off.
+ */
+export interface CachedCheckSelection {
+  readonly rural: boolean;
+  readonly area: boolean;
+}
+
 /** How the app is drawn and how much it moves. */
 export interface AppAccessibilitySettings {
   readonly theme: ThemeMode;
@@ -29,9 +38,11 @@ export interface AppAccessibilitySettings {
 export interface AppPreferences {
   readonly accessibility: AppAccessibilitySettings;
   readonly columnMapping: CachedColumnMapping;
+  readonly checkSelection: CachedCheckSelection;
 }
 
 export const defaultPreferences: AppPreferences = {
   accessibility: { theme: "system", highContrast: false, reduceMotion: false },
   columnMapping: {},
+  checkSelection: { rural: false, area: false },
 };

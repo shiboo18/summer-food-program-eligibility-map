@@ -1,5 +1,5 @@
 {
-  "name": "@amzn/share-our-strengths-backend",
+  "name": "share-our-strengths-backend",
   "version": "0.1.0",
   "private": true,
   "type": "module",

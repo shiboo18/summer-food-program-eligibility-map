@@ -5,11 +5,11 @@ export const checksStep: WorkflowStep = {
   label: "Choose checks",
   summary: "Pick which USDA checks to run — rural and area eligibility are checked online against USDA data.",
   sectionId: "checks-section",
-  focusSelector: "#check-rural",
-  title: () => "Which checks to run",
+  focusSelector: "#check-address-validation",
+  title: () => "Choose checks",
   description: (context) =>
     context.fileName === null
-      ? "Upload and map an Excel file to choose checks."
-      : "Address validation is required — it produces the geocode the USDA eligibility checks need.",
+      ? "Upload and map a file to choose checks."
+      : "Address validation always runs. Add USDA checks if you need them.",
   isAvailable: (context) => context.fileName !== null,
 };

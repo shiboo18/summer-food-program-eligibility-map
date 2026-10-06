@@ -44,6 +44,10 @@ contextBridge.exposeInMainWorld(
       validate: (fileName: string, mapping: ColumnMapping) =>
         ipcRenderer.invoke("spreadsheet:validate", { fileName, mapping }) as Promise<ValidationReport>,
     }),
+    eligibility: Object.freeze({
+      check: (fileName: string, mapping: ColumnMapping, checks: EligibilityChecks) =>
+        ipcRenderer.invoke("eligibility:check", { fileName, mapping, checks }) as Promise<EligibilityReport>,
+    }),
     results: Object.freeze({
       export: (fileName: string) =>
         ipcRenderer.invoke("results:export", { fileName }) as Promise<ExportResult>,
@@ -55,10 +59,6 @@ contextBridge.exposeInMainWorld(
         ipcRenderer.on("run:progress", handler);
         return () => ipcRenderer.removeListener("run:progress", handler);
       },
-    }),
-    eligibility: Object.freeze({
-      check: (fileName: string, mapping: ColumnMapping, checks: EligibilityChecks) =>
-        ipcRenderer.invoke("eligibility:check", { fileName, mapping, checks }) as Promise<EligibilityReport>,
     }),
     settings: Object.freeze({
       getStatus: () => ipcRenderer.invoke("settings:get-status") as Promise<CredentialStatus>,

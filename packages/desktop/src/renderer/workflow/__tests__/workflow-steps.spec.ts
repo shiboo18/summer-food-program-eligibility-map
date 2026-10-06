@@ -37,7 +37,7 @@ describe("workflowSteps", () => {
     const [upload, mapColumns, checks, results] = workflowSteps;
     expect(upload?.description(uploaded)).toContain("addresses.xlsx");
     expect(mapColumns?.description(uploaded)).toContain("addresses.xlsx");
-    expect(checks?.description(uploaded)).toContain("Address validation is required");
+    expect(checks?.description(uploaded)).toContain("Address validation always runs");
     expect(results?.title(validated)).toBe("All addresses deliverable");
     expect(results?.description(validated)).toContain("export an annotated copy");
   });

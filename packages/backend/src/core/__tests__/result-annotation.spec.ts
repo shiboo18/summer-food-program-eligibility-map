@@ -1,132 +1,132 @@
 import { describe, expect, test } from "vitest";
 
 import type { RowVerification } from "../../types/address.js";
-import type { EligibilityChecks, EligibilityRowResult } from "../../types/eligibility.js";
-import { toResultAnnotation, toResultAnnotations } from "../result-annotation.js";
+import type { EligibilityRowResult } from "../../types/eligibility.js";
+import { toResultAnnotation } from "../result-annotation.js";
 
-const bothChecks: EligibilityChecks = { rural: true, area: true };
+const bothChecks = { rural: true, area: true };
 const verified: RowVerification = { status: "verified" };
 
 function row(overrides: Partial<EligibilityRowResult>): EligibilityRowResult {
-  return { rowNumber: 2, confidence: "high", needsVerification: false, messages: [], ...overrides };
-}
-
-function eligibility(result: EligibilityRowResult | undefined, checks: EligibilityChecks = bothChecks) {
-  return { checks, rows: new Map(result === undefined ? [] : [[result.rowNumber, result]]) };
+  return {
+    rowNumber: 2,
+    precision: "rooftop",
+    confidence: "high",
+    needsVerification: false,
+    messages: [],
+    ...overrides,
+  };
 }
 
 describe("toResultAnnotation", () => {
-  test("keeps the validation-only annotation when no USDA check ran", () => {
-    expect(toResultAnnotation(2, verified)).toEqual({ rowNumber: 2, deliverability: "Valid" });
-    expect(toResultAnnotation(2, verified, eligibility(row({}), { rural: false, area: false }))).toEqual({
-      rowNumber: 2,
-      deliverability: "Valid",
-    });
-  });
-
-  test("keeps the standardized address only for a corrected row", () => {
-    expect(toResultAnnotation(2, { status: "corrected", standardizedAddress: "1 MAIN ST" })).toEqual({
-      rowNumber: 2,
-      deliverability: "Valid and corrected",
-      standardizedAddress: "1 MAIN ST",
-    });
-  });
-
-  test("maps a deliverable, confident, eligible and rural row to Ready=Yes", () => {
-    const annotation = toResultAnnotation(
-      2,
-      verified,
-      eligibility(row({ rural: { designation: "rural", matchedCriteria: [] }, area: { eligibility: "eligible" } })),
-    );
+  test("maps a verified rooftop row's verdicts and location", () => {
+    const annotation = toResultAnnotation(2, verified, bothChecks, row({
+      rural: { designation: "rural", matchedCriteria: ["County not part of an MSA"] },
+      area: { eligibility: "eligible" },
+    }));
 
     expect(annotation).toEqual({
       rowNumber: 2,
       deliverability: "Valid",
+      location: "Exact address",
       rural: "Rural",
       area: "In Area — Eligible",
-      ready: "Yes",
     });
   });
 
-  test("maps averaged-eligible to the averaged label and still Ready=Yes", () => {
+  test("a corrected address reads Valid and corrected and carries the standardized address", () => {
     const annotation = toResultAnnotation(
-      2,
-      verified,
-      eligibility(
-        row({ rural: { designation: "rural", matchedCriteria: [] }, area: { eligibility: "averaged-eligible" } }),
-      ),
+      3,
+      { status: "corrected", standardizedAddress: "1 Main St, Austin, TX 78701" },
+      bothChecks,
+      row({ area: { eligibility: "averaged-eligible" }, rural: { designation: "rural", matchedCriteria: [] } }),
     );
 
+    expect(annotation.deliverability).toBe("Valid and corrected");
+    expect(annotation.standardizedAddress).toBe("1 Main St, Austin, TX 78701");
     expect(annotation.area).toBe("In Area — Averaged");
-    expect(annotation.ready).toBe("Yes");
+    expect(annotation.rural).toBe("Rural");
   });
 
-  test("is not ready when area-eligible but not rural", () => {
-    const annotation = toResultAnnotation(
-      2,
-      verified,
-      eligibility(row({ rural: { designation: "not-rural", matchedCriteria: [] }, area: { eligibility: "eligible" } })),
-    );
+  test("maps a not-rural, not-eligible row", () => {
+    const annotation = toResultAnnotation(4, verified, bothChecks, row({
+      rural: { designation: "not-rural", matchedCriteria: [] },
+      area: { eligibility: "not-eligible" },
+    }));
 
     expect(annotation.rural).toBe("Not Rural");
-    expect(annotation.ready).toBe("No");
+    expect(annotation.area).toBe("Not Eligible");
   });
 
-  test("marks an invalid address's USDA columns Not Verified and Ready=No", () => {
-    expect(toResultAnnotation(5, { status: "unverified" }, eligibility(undefined))).toEqual({
+  test("hedges the verdicts when the location is approximate", () => {
+    const annotation = toResultAnnotation(6, verified, bothChecks, row({
+      precision: "postal",
+      rural: { designation: "rural", matchedCriteria: [] },
+      area: { eligibility: "eligible" },
+    }));
+
+    expect(annotation.location).toBe("ZIP area");
+    expect(annotation.rural).toBe("Rural (approximate location)");
+    expect(annotation.area).toBe("In Area — Eligible (approximate location)");
+  });
+
+  test("does not hedge a street-level location", () => {
+    const annotation = toResultAnnotation(6, verified, bothChecks, row({
+      precision: "street",
+      rural: { designation: "not-rural", matchedCriteria: [] },
+      area: { eligibility: "not-eligible" },
+    }));
+
+    expect(annotation.location).toBe("Street level");
+    expect(annotation.rural).toBe("Not Rural");
+    expect(annotation.area).toBe("Not Eligible");
+  });
+
+  test("names the location precision class", () => {
+    const cases = [
+      ["rooftop", "Exact address"],
+      ["street", "Street level"],
+      ["postal", "ZIP area"],
+      ["locality", "Town area"],
+      ["unknown", "Not located"],
+    ] as const;
+
+    for (const [precision, label] of cases) {
+      expect(toResultAnnotation(1, verified, bothChecks, row({ precision })).location).toBe(label);
+    }
+  });
+
+  test("an unverified row reads Invalid, Not located, and Not Verified", () => {
+    const annotation = toResultAnnotation(5, { status: "unverified" }, bothChecks, undefined);
+
+    expect(annotation).toEqual({
       rowNumber: 5,
       deliverability: "Invalid",
+      location: "Not located",
       rural: "Not Verified",
       area: "Not Verified",
-      ready: "No",
     });
   });
 
-  test("does not trust an approximate location", () => {
-    const annotation = toResultAnnotation(
-      2,
-      verified,
-      eligibility(
-        row({
-          confidence: "low",
-          needsVerification: true,
-          rural: { designation: "rural", matchedCriteria: [] },
-          area: { eligibility: "eligible" },
-        }),
-      ),
-    );
+  test("a verified row whose check produced no result reads Not Verified", () => {
+    const annotation = toResultAnnotation(10, verified, bothChecks, row({ area: { eligibility: "eligible" } }));
 
     expect(annotation.rural).toBe("Not Verified");
-    expect(annotation.area).toBe("Not Verified");
-    expect(annotation.ready).toBe("No");
+    expect(annotation.area).toBe("In Area — Eligible");
   });
 
-  test("omits the column for a check that was not selected", () => {
-    const annotation = toResultAnnotation(
-      2,
-      verified,
-      eligibility(row({ area: { eligibility: "eligible" } }), { rural: false, area: true }),
-    );
+  test("omits columns for checks that were not selected", () => {
+    const annotation = toResultAnnotation(7, verified, { rural: false, area: true }, row({
+      area: { eligibility: "eligible" },
+    }));
 
     expect(annotation.rural).toBeUndefined();
     expect(annotation.area).toBe("In Area — Eligible");
   });
 
-  test("reads an unknown area as Not Verified", () => {
-    const annotation = toResultAnnotation(2, verified, eligibility(row({ area: { eligibility: "unknown" } })));
+  test("unknown area (no polygon) reads Not Verified", () => {
+    const annotation = toResultAnnotation(8, verified, bothChecks, row({ area: { eligibility: "unknown" } }));
 
     expect(annotation.area).toBe("Not Verified");
-    expect(annotation.ready).toBe("No");
-  });
-});
-
-describe("toResultAnnotations", () => {
-  test("returns one annotation per row, in row order", () => {
-    const verifications = new Map<number, RowVerification>([
-      [4, { status: "unverified" }],
-      [2, verified],
-    ]);
-
-    expect(toResultAnnotations(verifications).map((annotation) => annotation.rowNumber)).toEqual([2, 4]);
   });
 });

@@ -1,4 +1,4 @@
-# AGENTS.md — ShareOurStrengthsApp
+# AGENTS.md — vibeCheck
 
 Guide for agents and contributors working in this package. Read this before writing code.
 
@@ -84,16 +84,11 @@ body — handle that explicitly in service code, don't rely on HTTP status alone
 
 ## Build & test
 
-This runs on the **public npm registry with plain npm — not brazil-build — for local development.**
-(The scaffold's internal-only `@amzn/brazil` devDependency is removed locally so install works; it is
-packaging-only and not needed to build or run.)
-
 ```bash
-# from packages root: src/ShareOurStrengthsApp
-npm install --registry=https://registry.npmjs.org
+# from the repository root
+npm ci
 npm run build                      # tsc -b + copy-static -> packages/*/dist
-npx vitest run                     # unit tests (npm test adds an internal coverage hook that
-                                   #   exits 127 locally AFTER tests pass — harmless)
+npx vitest run                     # unit tests (npm test runs them with coverage)
 npm run typecheck:tests            # typechecks the specs, which `npm run build` excludes
 ./node_modules/.bin/electron .     # launch the desktop app (add --no-sandbox if the shell blocks it)
 ./node_modules/.bin/electron . --smoke-test   # headless startup check

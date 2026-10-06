@@ -41,45 +41,73 @@ export interface AddressRowsResult {
 /** Sponsor-readable deliverability verdict written into the results column. */
 export type DeliverabilityLabel = "Valid" | "Valid and corrected" | "Invalid";
 
-/** Sponsor-readable rural verdict; "Not Verified" when the location could not be trusted. */
-export type RuralLabel = "Rural" | "Not Rural" | "Not Verified";
+/**
+ * Sponsor-readable rural verdict; "Not Verified" when the row was not checked.
+ * The "(approximate location)" variants hedge the verdict when the row was
+ * placed too coarsely to trust which block group it fell in.
+ */
+export type RuralLabel =
+  | "Rural"
+  | "Not Rural"
+  | "Not Verified"
+  | "Rural (approximate location)"
+  | "Not Rural (approximate location)";
 
 /**
  * Sponsor-readable USDA area-eligibility verdict; "Not Verified" when the row
- * was undeliverable or the location was too approximate to trust.
+ * was undeliverable or its check produced no result. The "(approximate
+ * location)" variants hedge the verdict when the location was too coarse to
+ * trust which block group it fell in.
  */
-export type AreaLabel = "In Area — Eligible" | "In Area — Averaged" | "Not Eligible" | "Not Verified";
+export type AreaLabel =
+  | "In Area — Eligible"
+  | "In Area — Averaged"
+  | "Not Eligible"
+  | "Not Verified"
+  | "In Area — Eligible (approximate location)"
+  | "In Area — Averaged (approximate location)"
+  | "Not Eligible (approximate location)";
 
-/** Ready-to-ship verdict: deliverable AND confidently located AND rural AND area-eligible. */
-export type ReadyLabel = "Yes" | "No";
+/**
+ * Sponsor-readable location precision in plain language, worst to best: how
+ * tightly the row was placed, which decides whether its block group can be
+ * trusted. "Exact address" and "Street level" are trusted; "ZIP area" and "Town
+ * area" are only approximate; "Not located" means no coordinate was resolved.
+ */
+export type LocationLabel = "Exact address" | "Street level" | "ZIP area" | "Town area" | "Not located";
 
-/** One row's verification result to annotate back into the spreadsheet. */
+/**
+ * One row's check results to annotate back into the spreadsheet. Only the
+ * columns for checks that were run are present; absent fields leave that cell
+ * blank rather than writing "Not Verified".
+ */
 export interface ResultAnnotation {
   readonly rowNumber: number;
   readonly deliverability: DeliverabilityLabel;
   /** The standardized address, present only when the input was corrected. */
   readonly standardizedAddress?: string;
-  /** USDA rural verdict, present only when the rural check ran. */
+  /** How precisely the row was located. */
+  readonly location?: LocationLabel;
   readonly rural?: RuralLabel;
-  /** USDA area-eligibility verdict, present only when the area check ran. */
   readonly area?: AreaLabel;
-  /** Ready-to-ship verdict, present only when a USDA check ran. */
-  readonly ready?: ReadyLabel;
 }
 
 /** Header names for the appended result columns (kept in config, passed through). */
 export interface ResultColumns {
   readonly standardized: string;
   readonly deliverability: string;
+  readonly location: string;
   readonly rural: string;
   readonly area: string;
-  readonly ready: string;
 }
 
 /** Which result columns to write, and where to write them. */
 export interface ResultColumnOptions {
   /** Which result columns to add and their header names. */
   readonly columns: ResultColumns;
+  /** Whether the rural / area columns should be written (checks that ran). */
+  readonly includeRural: boolean;
+  readonly includeArea: boolean;
   /** Where to write the annotated copy. The partner's original is never written to. */
   readonly outputPath: string;
 }

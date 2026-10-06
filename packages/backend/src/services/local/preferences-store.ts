@@ -78,6 +78,7 @@ function parsePreferences(value: unknown): AppPreferences {
   return {
     accessibility: parseAccessibility(source.accessibility),
     columnMapping: parseColumnMapping(source.columnMapping),
+    checkSelection: parseFlags(source.checkSelection, defaultPreferences.checkSelection),
   };
 }
 

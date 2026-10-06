@@ -13,9 +13,9 @@ const directories: string[] = [];
 const resultColumns = {
   standardized: "Standardized Address",
   deliverability: "Address Checks",
+  location: "Address Match Level",
   rural: "USDA Rural",
-  area: "USDA Area Eligibility",
-  ready: "Ready to Ship",
+  area: "USDA Eligibility",
 };
 
 afterEach(async () => {
@@ -57,10 +57,13 @@ async function createWorkbook(): Promise<string> {
 async function annotateToCopy(
   filePath: string,
   annotations: readonly ResultAnnotation[],
+  checks: { readonly includeRural: boolean; readonly includeArea: boolean },
 ): Promise<string> {
   const outputPath = filePath.replace(/\.xlsx$/, "-results.xlsx");
   await new ExcelSpreadsheetReader().annotateResults(filePath, annotations, {
     columns: resultColumns,
+    includeRural: checks.includeRural,
+    includeArea: checks.includeArea,
     outputPath,
   });
   return outputPath;
@@ -231,7 +234,10 @@ describe("ExcelSpreadsheetReader", () => {
   test("appends result columns to the names row rather than the top row", async () => {
     const filePath = await createWorkbookWithLegend();
 
-    const copyPath = await annotateToCopy(filePath, [{ rowNumber: 3, deliverability: "Valid" }]);
+    const copyPath = await annotateToCopy(filePath, [{ rowNumber: 3, deliverability: "Valid" }], {
+      includeRural: false,
+      includeArea: false,
+    });
 
     const summary = await new ExcelSpreadsheetReader().readSummary(copyPath);
     expect(summary.headers).toContain("Address Checks");
@@ -275,21 +281,34 @@ describe("ExcelSpreadsheetReader", () => {
   test("annotateResults appends the standardized column before the checks and preserves original data", async () => {
     const filePath = await createWorkbook();
 
-    const copyPath = await annotateToCopy(filePath, [
-      {
-        rowNumber: 2,
-        deliverability: "Valid and corrected",
-        standardizedAddress: "123 Main St, Austin, TX 78701-1234",
-      },
-      { rowNumber: 3, deliverability: "Invalid" },
-    ]);
+    const copyPath = await annotateToCopy(
+      filePath,
+      [
+        {
+          rowNumber: 2,
+          deliverability: "Valid and corrected",
+          standardizedAddress: "123 Main St, Austin, TX 78701-1234",
+          location: "Exact address",
+          rural: "Rural",
+          area: "In Area — Eligible",
+        },
+        { rowNumber: 3, deliverability: "Invalid", location: "Not located", rural: "Not Verified", area: "Not Verified" },
+      ],
+      { includeRural: true, includeArea: true },
+    );
 
     const workbook = new ExcelJS.Workbook();
     await workbook.xlsx.readFile(copyPath);
     const sheet = workbook.worksheets[0]!;
     /* `values` is 1-based, so index 6 onward is what was appended past the five originals. */
     const header = sheet.getRow(1).values as unknown[];
-    expect(header.slice(6)).toEqual(["Standardized Address", "Address Checks"]);
+    expect(header.slice(6)).toEqual([
+      "Standardized Address",
+      "Address Checks",
+      "Address Match Level",
+      "USDA Rural",
+      "USDA Eligibility",
+    ]);
     // Original columns untouched.
     expect(sheet.getRow(2).getCell(1).value).toBe("123 Main St");
     // Standardized address written only for the corrected row, in the column before the status.
@@ -298,20 +317,34 @@ describe("ExcelSpreadsheetReader", () => {
     // Corrected addresses are color-coded, and the column is widened so it reads without resizing.
     expect((sheet.getRow(2).getCell(6).fill as ExcelJS.FillPattern).fgColor?.argb).toBe("FFFCE9C8");
     expect(sheet.getColumn(6).width).toBe(36);
-    // Status cell written and color-coded green for deliverable.
+    // Status cell written and color-coded.
     const statusCell = sheet.getRow(2).getCell(7);
     expect(statusCell.value).toBe("Valid and corrected");
     expect((statusCell.fill as ExcelJS.FillPattern).fgColor?.argb).toBe("FFDDF3DD");
-    // An undeliverable row is color-coded red.
+    // Location column, color-coded by trust: green exact address, grey not located.
+    const rooftopCell = sheet.getRow(2).getCell(8);
+    expect(rooftopCell.value).toBe("Exact address");
+    expect((rooftopCell.fill as ExcelJS.FillPattern).fgColor?.argb).toBe("FFDDF3DD");
+    const notLocatedCell = sheet.getRow(3).getCell(8);
+    expect(notLocatedCell.value).toBe("Not located");
+    expect((notLocatedCell.fill as ExcelJS.FillPattern).fgColor?.argb).toBe("FFF2F2F2");
+    expect(sheet.getRow(2).getCell(9).value).toBe("Rural");
+    expect(sheet.getRow(2).getCell(10).value).toBe("In Area — Eligible");
     const invalidCell = sheet.getRow(3).getCell(7);
     expect(invalidCell.value).toBe("Invalid");
     expect((invalidCell.fill as ExcelJS.FillPattern).fgColor?.argb).toBe("FFF6D6D6");
+    const notVerifiedCell = sheet.getRow(3).getCell(9);
+    expect(notVerifiedCell.value).toBe("Not Verified");
+    expect((notVerifiedCell.fill as ExcelJS.FillPattern).fgColor?.argb).toBe("FFF2F2F2");
   });
 
-  test("annotateResults appends only the standardized and checks columns", async () => {
+  test("annotateResults omits rural/area columns when those checks did not run", async () => {
     const filePath = await createWorkbook();
 
-    const copyPath = await annotateToCopy(filePath, [{ rowNumber: 2, deliverability: "Valid" }]);
+    const copyPath = await annotateToCopy(filePath, [{ rowNumber: 2, deliverability: "Valid" }], {
+      includeRural: false,
+      includeArea: false,
+    });
 
     const summary = await new ExcelSpreadsheetReader().readSummary(copyPath);
     expect(summary.headers).toEqual([
@@ -322,6 +355,7 @@ describe("ExcelSpreadsheetReader", () => {
       "Zip",
       "Standardized Address",
       "Address Checks",
+      "Address Match Level",
     ]);
   });
 
@@ -329,40 +363,14 @@ describe("ExcelSpreadsheetReader", () => {
     const filePath = await createWorkbook();
     const reader = new ExcelSpreadsheetReader();
 
-    const copyPath = await annotateToCopy(filePath, [{ rowNumber: 2, deliverability: "Valid" }]);
+    const copyPath = await annotateToCopy(filePath, [{ rowNumber: 2, deliverability: "Valid" }], {
+      includeRural: false,
+      includeArea: false,
+    });
 
     const original = await reader.readSummary(filePath);
     expect(original.headers).not.toContain("Address Checks");
     const copy = await reader.readSummary(copyPath);
     expect(copy.headers).toContain("Address Checks");
-  });
-  test("annotateResults adds the USDA columns only when a check ran, color-coded by verdict", async () => {
-    const filePath = await createWorkbook();
-
-    const copyPath = await annotateToCopy(filePath, [
-      { rowNumber: 2, deliverability: "Valid", rural: "Rural", area: "In Area — Eligible", ready: "Yes" },
-      { rowNumber: 3, deliverability: "Valid", rural: "Not Verified", area: "Not Eligible", ready: "No" },
-    ]);
-
-    const workbook = new ExcelJS.Workbook();
-    await workbook.xlsx.readFile(copyPath);
-    const sheet = workbook.worksheets[0]!;
-    const header = sheet.getRow(1).values as unknown[];
-    expect(header.slice(6)).toEqual([
-      "Standardized Address",
-      "Address Checks",
-      "USDA Rural",
-      "USDA Area Eligibility",
-      "Ready to Ship",
-    ]);
-    const fillOf = (row: number, column: number): string | undefined =>
-      (sheet.getRow(row).getCell(column).fill as ExcelJS.FillPattern | undefined)?.fgColor?.argb;
-    expect(sheet.getRow(2).getCell(8).value).toBe("Rural");
-    expect(fillOf(2, 8)).toBe("FFDDF3DD");
-    expect(sheet.getRow(2).getCell(10).value).toBe("Yes");
-    // "Not Verified" is neutral, a failing verdict is red.
-    expect(fillOf(3, 8)).toBe("FFF2F2F2");
-    expect(fillOf(3, 9)).toBe("FFF6D6D6");
-    expect(fillOf(3, 10)).toBe("FFF6D6D6");
   });
 });
