@@ -20,8 +20,8 @@ import type {
 /** Cell fills for the color-coded result columns (ARGB, solid). */
 const goodFill = "FFDDF3DD";
 const badFill = "FFF6D6D6";
-const correctedFill = "FFFCE9C8";
 const neutralFill = "FFF2F2F2";
+const correctedFill = "FFFCE9C8";
 
 /** Reads and updates Excel workbooks with ExcelJS so no custom spreadsheet parsing is required. */
 export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWriter {
@@ -73,14 +73,12 @@ export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWri
   ): Promise<void> {
     const sheet = await loadFirstSheet(filePath);
     const { columns } = options;
-    /* The USDA columns are added only when a check ran, so a validation-only
-       run exports exactly the columns it always did. */
     const wanted = [
       columns.standardized,
       columns.deliverability,
-      ...(annotations.some((annotation) => annotation.rural !== undefined) ? [columns.rural] : []),
-      ...(annotations.some((annotation) => annotation.area !== undefined) ? [columns.area] : []),
-      ...(annotations.some((annotation) => annotation.ready !== undefined) ? [columns.ready] : []),
+      columns.location,
+      ...(options.includeRural ? [columns.rural] : []),
+      ...(options.includeArea ? [columns.area] : []),
     ];
 
     const { rowNumber: headerRowNumber, headers } = requireHeaderRow(sheet);
@@ -109,14 +107,14 @@ export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWri
         setResultCell(row, columnAt, columns.standardized, annotation.standardizedAddress, correctedFill);
       }
       setResultCell(row, columnAt, columns.deliverability, annotation.deliverability, fillFor(annotation.deliverability));
-      if (annotation.rural !== undefined) {
+      if (annotation.location !== undefined) {
+        setResultCell(row, columnAt, columns.location, annotation.location, locationFill(annotation.location));
+      }
+      if (options.includeRural && annotation.rural !== undefined) {
         setResultCell(row, columnAt, columns.rural, annotation.rural, fillFor(annotation.rural));
       }
-      if (annotation.area !== undefined) {
+      if (options.includeArea && annotation.area !== undefined) {
         setResultCell(row, columnAt, columns.area, annotation.area, fillFor(annotation.area));
-      }
-      if (annotation.ready !== undefined) {
-        setResultCell(row, columnAt, columns.ready, annotation.ready, fillFor(annotation.ready));
       }
       row.commit();
     }
@@ -145,13 +143,25 @@ function setResultCell(
 
 /** Green for a passing verdict, red for a failing one, neutral for "Not Verified". */
 function fillFor(value: string): string {
-  if (value === "Invalid" || value === "Not Rural" || value === "Not Eligible" || value === "No") {
+  const base = value.replace(" (approximate location)", "");
+  if (base === "Invalid" || base === "Not Rural" || base === "Not Eligible") {
     return badFill;
   }
-  if (value === "Not Verified") {
+  if (base === "Not Verified") {
     return neutralFill;
   }
   return goodFill;
+}
+
+/** Green for a trusted location, amber for an approximate one, neutral when not located. */
+function locationFill(value: string): string {
+  if (value === "Exact address" || value === "Street level") {
+    return goodFill;
+  }
+  if (value === "ZIP area" || value === "Town area") {
+    return correctedFill;
+  }
+  return neutralFill;
 }
 
 async function loadFirstSheet(filePath: string): Promise<ExcelJS.Worksheet> {

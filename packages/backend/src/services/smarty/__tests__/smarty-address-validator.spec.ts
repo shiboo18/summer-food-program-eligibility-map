@@ -21,7 +21,41 @@ function candidate(deliveryLine1: string) {
 const credentials = async () => ({ authId: "auth-id", authToken: "auth-token" });
 
 describe("SmartyAddressValidator", () => {
-  test("corrects an input whose USPS-normalized address differs from what was typed", async () => {
+  test("includes Smarty’s coordinate and maps its precision class", async () => {
+    const send = vi.fn(async (batch: Batch): Promise<void> => {
+      (batch.getByIndex(0) as Lookup).result.push(
+        new SmartySDK.usStreet.Candidate({
+          delivery_line_1: "1 MAIN STREET",
+          components: { city_name: "AUSTIN", state_abbreviation: "TX", zipcode: "78701" },
+          metadata: { latitude: 30.27, longitude: -97.74, precision: "Zip9" },
+        }),
+      );
+    });
+    const validator = new SmartyAddressValidator(credentials, () => ({ send }));
+
+    const [result] = await validator.validate([address("1 Main St")]);
+
+    expect(result?.location).toEqual({ lat: 30.27, lng: -97.74, score: 100, precision: "postal" });
+  });
+
+  test("maps a rooftop match to the rooftop class", async () => {
+    const send = vi.fn(async (batch: Batch): Promise<void> => {
+      (batch.getByIndex(0) as Lookup).result.push(
+        new SmartySDK.usStreet.Candidate({
+          delivery_line_1: "1 MAIN STREET",
+          components: { city_name: "AUSTIN", state_abbreviation: "TX", zipcode: "78701" },
+          metadata: { latitude: 30.27, longitude: -97.74, precision: "Rooftop" },
+        }),
+      );
+    });
+    const validator = new SmartyAddressValidator(credentials, () => ({ send }));
+
+    const [result] = await validator.validate([address("1 Main St")]);
+
+    expect(result?.location).toEqual({ lat: 30.27, lng: -97.74, score: 100, precision: "rooftop" });
+  });
+
+  test("omits the location when Smarty returns no coordinate", async () => {
     const send = vi.fn(async (batch: Batch): Promise<void> => {
       (batch.getByIndex(0) as Lookup).result.push(candidate("1 MAIN STREET"));
     });
@@ -29,8 +63,8 @@ describe("SmartyAddressValidator", () => {
 
     const [result] = await validator.validate([address("1 Main St")]);
 
+    expect(result?.location).toBeUndefined();
     expect(result?.status).toBe("corrected");
-    expect(result?.normalizedAddress?.line1).toBe("1 MAIN STREET");
   });
 
   test("marks an incomplete candidate as unverified rather than trusting a partial address", async () => {
@@ -68,23 +102,6 @@ describe("SmartyAddressValidator", () => {
 
     expect(result?.status).toBe("corrected");
     expect(result?.normalizedAddress?.postalCode).toBe("78701-1234");
-  });
-
-  test("includes Smarty's coordinate and a precision-based score", async () => {
-    const send = vi.fn(async (batch: Batch): Promise<void> => {
-      (batch.getByIndex(0) as Lookup).result.push(
-        new SmartySDK.usStreet.Candidate({
-          delivery_line_1: "1 MAIN STREET",
-          components: { city_name: "AUSTIN", state_abbreviation: "TX", zipcode: "78701" },
-          metadata: { latitude: 30.27, longitude: -97.74, precision: "Zip9" },
-        }),
-      );
-    });
-    const validator = new SmartyAddressValidator(credentials, () => ({ send }));
-
-    const [result] = await validator.validate([address("1 Main St")]);
-
-    expect(result?.location).toEqual({ lat: 30.27, lng: -97.74, score: 85 });
   });
 
   test("sends one batch and returns a result per input, in order", async () => {

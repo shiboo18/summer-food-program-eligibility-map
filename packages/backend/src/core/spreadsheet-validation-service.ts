@@ -1,21 +1,20 @@
 import type { AddressValidator, SpreadsheetReader } from "../contracts.js";
 import type { Address, FailedAddress, RowVerification, ValidationReport } from "../types/address.js";
-import type { GeocodeResult } from "../types/eligibility.js";
+import type { ValidatedLocation } from "../types/eligibility.js";
 import type { ProgressReporter } from "../types/progress.js";
 import type { AddressRowsResult, ColumnMapping } from "../types/spreadsheet.js";
 
-/** A validation report plus what the results annotation needs, keyed by row number. */
+/** A validation report plus what each row's location pass can reuse, keyed by row number. */
 export interface SpreadsheetValidationResult {
   readonly report: ValidationReport;
+  readonly locations: ReadonlyMap<number, ValidatedLocation>;
   /** Per-row verification outcome, keyed by row number, for the results annotation. */
   readonly verifications: ReadonlyMap<number, RowVerification>;
-  /** The rows parsed from the workbook. */
-  readonly addressRows: AddressRowsResult;
   /**
-   * The coordinate Smarty returned for each row, keyed by row number, so the
-   * eligibility pipeline can reuse it instead of sending the address again.
+   * The rows parsed from the workbook, so the eligibility pass can reuse them
+   * instead of reading and parsing the same file a second time.
    */
-  readonly geocodes: ReadonlyMap<number, GeocodeResult>;
+  readonly addressRows: AddressRowsResult;
 }
 
 /** One pass over a partner's workbook: where to read it from, and how. */
@@ -37,7 +36,9 @@ export interface SpreadsheetValidationRequest {
  * Validates every mapped spreadsheet row and reports the rows that need
  * attention. The partner's workbook is only ever read: Smarty's suggested
  * address reaches them as the standardized-address column of the results copy
- * they download, never by overwriting what they typed.
+ * they download, never by overwriting what they typed. Also returns the Smarty
+ * coordinate found for each row so the eligibility pipeline can reuse it
+ * instead of calling Smarty a second time.
  */
 export class SpreadsheetValidationService {
   public constructor(
@@ -59,8 +60,8 @@ export class SpreadsheetValidationService {
       rows.map((row) => row.address),
       onProgress === undefined ? undefined : (completed) => onProgress(completed + skipped.length),
     );
+    const locations = new Map<number, ValidatedLocation>();
     const verifications = new Map<number, RowVerification>();
-    const geocodes = new Map<number, GeocodeResult>();
     let verified = 0;
     let corrected = 0;
     for (const [index, row] of rows.entries()) {
@@ -75,11 +76,16 @@ export class SpreadsheetValidationService {
         continue;
       }
       if (result.location !== undefined) {
-        geocodes.set(row.rowNumber, {
-          point: { lat: result.location.lat, lng: result.location.lng },
-          score: result.location.score,
-          matchedAddress: formatAddress(result.normalizedAddress ?? row.address),
-          source: "smarty",
+        locations.set(row.rowNumber, {
+          geocode: {
+            point: { lat: result.location.lat, lng: result.location.lng },
+            score: result.location.score,
+            precision: result.location.precision,
+            matchedAddress: formatAddress(result.normalizedAddress ?? row.address),
+          },
+          /* Carried so the geocoder looks up the corrected address rather than
+             whatever the partner typed. */
+          ...(result.normalizedAddress === undefined ? {} : { standardizedAddress: result.normalizedAddress }),
         });
       }
       if (result.status === "corrected" && result.normalizedAddress !== undefined) {
@@ -103,9 +109,9 @@ export class SpreadsheetValidationService {
         corrected,
         failures,
       },
+      locations,
       verifications,
       addressRows,
-      geocodes,
     };
   }
 }

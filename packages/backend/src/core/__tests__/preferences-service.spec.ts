@@ -23,16 +23,9 @@ describe("PreferencesService", () => {
 
   test("reads a single preference", async () => {
     const service = new PreferencesService(
-      createStore({
-        ...defaultPreferences,
-        accessibility: { theme: "dark", highContrast: false, reduceMotion: false },
-      }),
+      createStore({ ...defaultPreferences, checkSelection: { rural: true, area: false } }),
     );
-    await expect(service.read("accessibility")).resolves.toEqual({
-      theme: "dark",
-      highContrast: false,
-      reduceMotion: false,
-    });
+    await expect(service.read("checkSelection")).resolves.toEqual({ rural: true, area: false });
   });
 
   test("creates and updates through one write", async () => {
@@ -46,27 +39,19 @@ describe("PreferencesService", () => {
 
   test("removing a preference restores its default", async () => {
     const service = new PreferencesService(
-      createStore({
-        ...defaultPreferences,
-        columnMapping: { line1: "Street" },
-        accessibility: { theme: "dark", highContrast: false, reduceMotion: false },
-      }),
+      createStore({ ...defaultPreferences, columnMapping: { line1: "Street" }, checkSelection: { rural: true, area: false } }),
     );
 
     const updated = await service.remove("columnMapping");
 
     expect(updated.columnMapping).toEqual({});
     // Unrelated preferences are untouched.
-    expect(updated.accessibility).toEqual({ theme: "dark", highContrast: false, reduceMotion: false });
+    expect(updated.checkSelection).toEqual({ rural: true, area: false });
   });
 
   test("resetting restores every default", async () => {
     const service = new PreferencesService(
-      createStore({
-        ...defaultPreferences,
-        accessibility: { theme: "dark", highContrast: true, reduceMotion: true },
-        columnMapping: { line1: "A1" },
-      }),
+      createStore({ ...defaultPreferences, checkSelection: { rural: true, area: true }, columnMapping: { line1: "A1" } }),
     );
 
     await expect(service.reset()).resolves.toEqual(defaultPreferences);

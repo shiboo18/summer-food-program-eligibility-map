@@ -13,23 +13,33 @@ export {
 export { AppPreferenceStore as PreferencesStore } from "./services/local/preferences-store.js";
 export { ExcelSpreadsheetReader } from "./services/local/excel-spreadsheet-reader.js";
 export { SmartyAddressValidator } from "./services/smarty/smarty-address-validator.js";
+export { UsdaRuralZoneMapChecker } from "./services/usda/usda-rural-zone-map-checker.js";
+export { UsdaSummerMealBenefitChecker } from "./services/usda/usda-summer-meal-benefit-checker.js";
+export { EsriGeocoder } from "./services/geocoder/esri-geocoder.js";
+export { KyHttpClient } from "./services/http/ky-http-client.js";
 
 export { PreferencesService } from "./core/preferences-service.js";
 export { SpreadsheetValidationService } from "./core/spreadsheet-validation-service.js";
+export { locateRows, type LocateRowsResult, type UnlocatedRow } from "./core/run/locate-rows.js";
+export {
+  buildEligibilityReport,
+  type EligibilityReportInput,
+} from "./core/run/eligibility-report.js";
+export { createPassReporters } from "./core/run/phase-progress.js";
 export { parseColumnMapping } from "./core/parse-column-mapping.js";
+export { toResultAnnotation } from "./core/result-annotation.js";
 
 export type {
   AppAccessibilitySettings,
   AppPreferences as Preferences,
+  CachedCheckSelection,
 } from "./types/preferences.js";
 
-export { RESULT_COLUMNS } from "./config/constants.js";
-
-/* USDA eligibility. */
-export { FetchJsonHttpClient } from "./services/http/fetch-json-http-client.js";
-export { EsriGeocoder } from "./services/geocoding/esri-geocoder.js";
-export { FallbackGeocoder } from "./services/geocoding/fallback-geocoder.js";
-export { UsdaRuralChecker } from "./services/usda/rural-checker.js";
-export { UsdaAreaEligibilityChecker } from "./services/usda/area-eligibility-checker.js";
-export { EligibilityRunner } from "./core/eligibility-runner.js";
-export { toResultAnnotations } from "./core/result-annotation.js";
+/* Endpoints are exported so the main process, as the composition root, can inject
+   each service's base URL into its own client. */
+export {
+  AREA_ELIGIBILITY_LAYER_URL,
+  ESRI_GEOCODE_SERVICE_URL,
+  RESULT_COLUMNS,
+  USDA_RURAL_SERVICE_URL,
+} from "./config/constants.js";

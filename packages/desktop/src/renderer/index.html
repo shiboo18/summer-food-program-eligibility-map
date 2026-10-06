@@ -51,9 +51,9 @@
       <section id="home-view" class="home-view" aria-labelledby="home-title">
         <h1 id="home-title">Welcome to vibeCheck.</h1>
         <p class="home-copy">
-          vibeCheck verifies and standardizes every address in an Excel workbook against Smarty.
-          <a id="home-settings-link" class="text-link" href="#" role="button">Open settings</a> to add your Smarty
-          credentials.
+          vibeCheck verifies every address in an Excel workbook against Smarty and ArcGIS, then checks USDA rural and
+          area eligibility. <a id="home-settings-link" class="text-link" href="#" role="button">Open settings</a> to add
+          your Smarty credentials.
         </p>
 
         <details class="privacy-note">
@@ -62,9 +62,11 @@
             Your data stays on your computer. Only the address fields are sent out — never names, phone numbers, or
             anything else in your spreadsheet.
           </p>
-          <p class="privacy-note-detail">Each address is sent only to the provider that checks it:</p>
+          <p class="privacy-note-detail">Each address is sent only to the providers that check it:</p>
           <ul class="privacy-providers">
             <li><strong>Smarty</strong> — verifies and standardizes each address.</li>
+            <li><strong>ArcGIS</strong> — finds the map location an address sits at.</li>
+            <li><strong>USDA</strong> — the rural and area-eligibility maps.</li>
           </ul>
         </details>
 
@@ -83,7 +85,7 @@
 
         <div class="workflow-main">
           <section class="intro" aria-labelledby="intro-title">
-            <p id="intro-eyebrow" class="eyebrow">Step 1 of 3</p>
+            <p id="intro-eyebrow" class="eyebrow">Step 1 of 4</p>
             <h1 id="intro-title">Upload an Excel file</h1>
             <p id="intro-copy" class="intro-copy">
               Choose the workbook that contains the addresses you want to validate.
@@ -173,7 +175,8 @@
 
           <section id="processing-section" class="processing-section" aria-labelledby="processing-title" hidden>
             <div class="processing-card" role="status" aria-live="polite">
-              <h2 id="processing-title">Checking addresses</h2>
+              <h2 id="processing-title">Running checks</h2>
+              <ol id="run-steps" class="run-steps" aria-hidden="true"></ol>
               <!-- The bar carries the value for assistive tech; the text beside it is
                    hidden from screen readers so a per-row update cannot flood this
                    polite live region. -->
@@ -195,19 +198,6 @@
 
           <section id="results-section" class="results-section" aria-labelledby="intro-title" hidden>
             <div id="results-stats" class="results-stats" aria-live="polite"></div>
-            <div id="results-body" class="results-body"></div>
-            <details class="results-legend">
-              <summary>What these columns mean</summary>
-              <dl class="results-legend-list">
-                <dt>Row</dt><dd>The row number in your spreadsheet.</dd>
-                <dt>Standardized address</dt><dd>The matched, cleaned-up address (USPS-standardized when deliverable).</dd>
-                <dt>Deliv.</dt><dd>Deliverable — USPS confirms mail is delivered there. "No" means it couldn't be confirmed as mailable (common for rural addresses).</dd>
-                <dt>Rural</dt><dd>The address is in a USDA-designated rural area.</dd>
-                <dt>Area</dt><dd>USDA area eligibility: In zone / In zone (with approval) / Out of zone.</dd>
-                <dt>Ready</dt><dd>Deliverable, confidently located, rural, and area-eligible — good to ship.</dd>
-                <dt>Verify?</dt><dd>"Yes" means the location is approximate — double-check this row before relying on its USDA result.</dd>
-              </dl>
-            </details>
             <div class="form-actions">
               <button id="download-results" class="primary-button is-active" type="button">
                 <span id="download-spinner" class="loading-spinner" aria-hidden="true" hidden></span>
@@ -261,6 +251,18 @@
             <div class="settings-actions">
               <button id="open-columns" class="primary-button is-active" type="button">
                 Set map columns
+              </button>
+            </div>
+          </div>
+
+          <div class="settings-group">
+            <h3>USDA checks</h3>
+            <p class="settings-intro">
+              Pick the checks to turn on by default. Address checking always runs.
+            </p>
+            <div class="settings-actions">
+              <button id="open-checks" class="primary-button is-active" type="button">
+                Change USDA checks
               </button>
             </div>
           </div>
@@ -344,6 +346,32 @@
           </div>
           <p id="column-settings-message" class="settings-message" aria-live="polite"></p>
         </form>
+      </div>
+    </div>
+
+    <div
+      id="checks-overlay"
+      class="welcome-overlay"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="checks-dialog-title"
+      hidden
+    >
+      <div class="welcome-card settings-dialog-card">
+        <div class="settings-form">
+          <h3 id="checks-dialog-title">USDA checks</h3>
+          <p class="settings-hint">
+            These are pre-selected on the Checks step. You can still change them for a single run.
+          </p>
+          <label class="settings-toggle">
+            <input id="pref-rural" type="checkbox" />
+            <span><strong>Rural designation</strong><small>Check whether each address is in a rural area.</small></span>
+          </label>
+          <label class="settings-toggle">
+            <input id="pref-area" type="checkbox" />
+            <span><strong>Area eligibility</strong><small>Check each address against USDA area eligibility.</small></span>
+          </label>
+        </div>
       </div>
     </div>
 

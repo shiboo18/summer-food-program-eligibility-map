@@ -1,24 +1,35 @@
 import {
-  EligibilityRunner,
+  AREA_ELIGIBILITY_LAYER_URL,
+  ESRI_GEOCODE_SERVICE_URL,
   EsriGeocoder,
   ExcelSpreadsheetReader,
-  FallbackGeocoder,
+  KyHttpClient,
   PreferencesService,
   PreferencesStore,
   RESULT_COLUMNS,
   SettingsStore,
   SmartyAddressValidator,
   SpreadsheetValidationService,
-  UsdaAreaEligibilityChecker,
-  UsdaRuralChecker,
+  USDA_RURAL_SERVICE_URL,
+  UsdaRuralZoneMapChecker,
+  UsdaSummerMealBenefitChecker,
+  buildEligibilityReport,
+  createPassReporters,
+  locateRows,
   parseColumnMapping,
-  toResultAnnotations,
+  toResultAnnotation,
+  type AddressRowsResult,
+  type AreaEligibilityResult,
+  type CheckOutcome,
+  type ColumnMapping,
   type EligibilityChecks,
-  type EligibilityReport,
+  type ValidatedLocation,
   type ProgressReporter,
+  type ResultAnnotation,
   type RowVerification,
+  type RunPhase,
   type RunProgress,
-  type GeocodeResult,
+  type RuralResult,
   type SpreadsheetSummary,
 } from "../../../backend/dist/index.js";
 import {
@@ -75,40 +86,53 @@ function createSmartyAddressValidator(settings: SettingsStore): SmartyAddressVal
 }
 
 /**
- * The eligibility geocoder. Smarty coordinates are reused from the validation
- * step (seeded per row), so the eligibility pipeline only needs the free Esri
- * World Geocoder as a fallback for rows Smarty could not locate.
+ * The services an eligibility run needs. Each gets its own client, carrying that
+ * service's base URL and its own retry budget, so a throttled USDA map cannot
+ * delay geocoding.
  */
-function createEligibilityRunner(): EligibilityRunner {
-  const geocoder = new FallbackGeocoder([new EsriGeocoder()]);
-  return new EligibilityRunner(geocoder, new UsdaRuralChecker(), new UsdaAreaEligibilityChecker());
+interface EligibilityServices {
+  readonly geocoder: EsriGeocoder;
+  readonly zone: UsdaRuralZoneMapChecker;
+  readonly benefit: UsdaSummerMealBenefitChecker;
+}
+
+function createEligibilityServices(): EligibilityServices {
+  return {
+    geocoder: new EsriGeocoder(new KyHttpClient(ESRI_GEOCODE_SERVICE_URL)),
+    zone: new UsdaRuralZoneMapChecker(new KyHttpClient(USDA_RURAL_SERVICE_URL)),
+    benefit: new UsdaSummerMealBenefitChecker(new KyHttpClient(AREA_ELIGIBILITY_LAYER_URL)),
+  };
 }
 
 function resolvedSystemTheme(): "light" | "dark" {
   return nativeTheme.shouldUseDarkColors ? "dark" : "light";
 }
 
+function toEligibilityChecks(input: unknown): EligibilityChecks {
+  const checks = typeof input === "object" && input !== null ? (input as Record<string, unknown>) : {};
+  return { rural: checks.rural === true, area: checks.area === true };
+}
+
+/** A stable key for a mapping, so cached rows are reused only under the same columns. */
+function columnMappingKey(mapping: ColumnMapping): string {
+  return [mapping.line1, mapping.line2 ?? "", mapping.city, mapping.state, mapping.postalCode].join("\u0000");
+}
+
 /**
- * A reporter that forwards validation progress to the frame that asked for the
- * run, so the screen can fill its bar as the work goes rather than only when it
- * lands.
+ * A reporter that forwards a phase's progress to the frame that asked for the run,
+ * so the screen can fill its bar as the work goes rather than only when it lands.
  *
- * @param total Every data row the sheet holds, so one bar spans the whole run.
+ * @param total Every data row the sheet holds, which is what both phases work
+ *   through, so one bar spans the whole run.
  */
-function reportProgressTo(event: IpcMainInvokeEvent, total: number): ProgressReporter {
+function reportProgressTo(event: IpcMainInvokeEvent, phase: RunPhase, total: number): ProgressReporter {
   return (completed: number): void => {
     if (event.sender.isDestroyed()) {
       return;
     }
-    const progress: RunProgress = { completed, total };
+    const progress: RunProgress = { phase, completed, total };
     event.sender.send("run:progress", progress);
   };
-}
-
-/** Reads which USDA checks the user ticked; anything unrecognised is treated as unticked. */
-function toEligibilityChecks(input: unknown): EligibilityChecks {
-  const checks = typeof input === "object" && input !== null ? (input as Record<string, unknown>) : {};
-  return { rural: checks.rural === true, area: checks.area === true };
 }
 
 function assertTrustedSender(event: IpcMainInvokeEvent): void {
@@ -139,17 +163,20 @@ function requireOpenedSpreadsheet(
 function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesService): void {
   const reader = new ExcelSpreadsheetReader();
   const validation = new SpreadsheetValidationService(reader, createSmartyAddressValidator(settings));
-  const eligibility = createEligibilityRunner();
+  const eligibility = createEligibilityServices();
   /** Summaries are kept in the main process so the renderer never supplies a file path. */
   const openedSpreadsheets = new Map<string, SpreadsheetSummary>();
-  /** Per-row Smarty verification (status + standardized address) from the most recent run, used for the export. */
+  /** Smarty coordinates from the most recent validation, reused by eligibility so Smarty is called once. */
+  const smartyLocations = new Map<string, ReadonlyMap<number, ValidatedLocation>>();
+  /** Per-row Smarty verification (status + standardized address), reused by eligibility for the annotation. */
   const rowVerifications = new Map<string, ReadonlyMap<number, RowVerification>>();
+  /** The most recent per-row result annotations, written to a copy only when the user downloads. */
+  const lastAnnotations = new Map<string, { annotations: readonly ResultAnnotation[]; checks: EligibilityChecks }>();
   /** Where each file's results were last exported, so the renderer can reveal it by name, never by path. */
   const exportedPaths = new Map<string, string>();
-  /** Smarty coordinates from the most recent validation, reused by eligibility so Smarty is called once. */
-  const smartyGeocodes = new Map<string, ReadonlyMap<number, GeocodeResult>>();
-  /** USDA results from the most recent eligibility run, added to the export when present. */
-  const eligibilityRuns = new Map<string, { checks: EligibilityChecks; report: EligibilityReport }>();
+  /** Rows parsed during validation, reused by the eligibility pass so a run reads the
+      workbook once. The mapping key guards a re-run under remapped columns from reusing rows read under the old mapping. */
+  const parsedRows = new Map<string, { readonly mappingKey: string; readonly rows: AddressRowsResult }>();
 
   ipcMain.handle("spreadsheet:open", async (event): Promise<unknown> => {
     assertTrustedSender(event);
@@ -190,66 +217,16 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
     const summary = requireOpenedSpreadsheet(openedSpreadsheets, fileName);
 
     const columnMapping = parseColumnMapping(mapping, summary.headers);
-    const { report, verifications, geocodes } = await validation.validate({
+    const { report, locations, verifications, addressRows } = await validation.validate({
       filePath: summary.filePath,
       mapping: columnMapping,
       fileName: summary.fileName,
-      onProgress: reportProgressTo(event, summary.rowCount),
+      onProgress: reportProgressTo(event, "verifying", summary.rowCount),
     });
+    smartyLocations.set(summary.fileName, locations);
     rowVerifications.set(summary.fileName, verifications);
-    smartyGeocodes.set(summary.fileName, geocodes);
-    /* A new validation run supersedes any earlier USDA results for this file. */
-    eligibilityRuns.delete(summary.fileName);
+    parsedRows.set(summary.fileName, { mappingKey: columnMappingKey(columnMapping), rows: addressRows });
     return report;
-  });
-
-  ipcMain.handle("results:export", async (event, input: unknown): Promise<unknown> => {
-    assertTrustedSender(event);
-    if (typeof input !== "object" || input === null) {
-      throw new Error("Export request is invalid.");
-    }
-    const { fileName } = input as { fileName?: unknown };
-    const summary = requireOpenedSpreadsheet(openedSpreadsheets, fileName);
-    const verifications = rowVerifications.get(summary.fileName);
-    if (verifications === undefined) {
-      throw new Error("Validate the addresses again before downloading results.");
-    }
-    const run = eligibilityRuns.get(summary.fileName);
-    const annotations = toResultAnnotations(
-      verifications,
-      run === undefined
-        ? undefined
-        : { checks: run.checks, rows: new Map(run.report.rows.map((row) => [row.rowNumber, row])) },
-    );
-
-    const suggestedName = summary.fileName.replace(/\.(xlsx|xlsm|xls)$/i, "") + "-results.xlsx";
-    const selection = await dialog.showSaveDialog({
-      title: "Save results spreadsheet",
-      defaultPath: suggestedName,
-      filters: [{ name: "Excel workbook", extensions: ["xlsx"] }],
-    });
-    if (selection.canceled || selection.filePath === undefined) {
-      return { canceled: true };
-    }
-
-    await reader.annotateResults(summary.filePath, annotations, {
-      columns: RESULT_COLUMNS,
-      outputPath: selection.filePath,
-    });
-    exportedPaths.set(summary.fileName, selection.filePath);
-    return { canceled: false, filePath: selection.filePath, rowsAnnotated: annotations.length };
-  });
-
-  /* Reveals the exported copy in the OS file manager. The path is looked up here by
-     file name, so it never has to travel through the renderer. */
-  ipcMain.handle("results:reveal", (event, fileName: unknown): void => {
-    assertTrustedSender(event);
-    const summary = requireOpenedSpreadsheet(openedSpreadsheets, fileName);
-    const exportedPath = exportedPaths.get(summary.fileName);
-    if (exportedPath === undefined) {
-      throw new Error("Export the results before opening them.");
-    }
-    shell.showItemInFolder(exportedPath);
   });
 
   ipcMain.handle("eligibility:check", async (event, input: unknown): Promise<unknown> => {
@@ -263,11 +240,134 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
 
     const columnMapping = parseColumnMapping(mapping, summary.headers);
     const selectedChecks = toEligibilityChecks(checks);
-    const { rows, skipped } = await reader.readAddressRows(summary.filePath, columnMapping);
-    const seedGeocodes = smartyGeocodes.get(summary.fileName);
-    const report = await eligibility.run(rows, selectedChecks, summary.fileName, skipped, seedGeocodes);
-    eligibilityRuns.set(summary.fileName, { checks: selectedChecks, report });
+    /* Reuse the rows validation already parsed when the mapping is unchanged, so a
+       run reads the workbook once; re-read if the columns were remapped since. */
+    const cachedRows = parsedRows.get(summary.fileName);
+    const { rows, skipped } =
+      cachedRows?.mappingKey === columnMappingKey(columnMapping)
+        ? cachedRows.rows
+        : await reader.readAddressRows(summary.filePath, columnMapping);
+
+    /* An address Smarty could not verify is not put through the USDA checks — a
+       result would have no verified location to stand on — so it is set aside up
+       front and reported as needing verification rather than checked. */
+    const verifications = rowVerifications.get(summary.fileName) ?? new Map<number, RowVerification>();
+    const isDeliverable = (rowNumber: number): boolean => {
+      const status = verifications.get(rowNumber)?.status;
+      return status === "verified" || status === "corrected";
+    };
+    const verifiedRows = rows.filter((row) => isDeliverable(row.rowNumber));
+    const unverified = rows.filter((row) => !isDeliverable(row.rowNumber)).map((row) => row.rowNumber);
+
+    /* Each USDA pass reports under its own phase so the run screen can name the
+       step now running. Locating shares a phase's slice with the check behind it,
+       so the bar fills end to end rather than one slice per pass.
+
+       When both checks run they go out concurrently: they hit different hosts, so
+       neither sees more than USDA_CHECK_CONCURRENCY at once, and their combined
+       progress walks the second slice forward as either pass finishes a row. */
+    const runConcurrently = selectedChecks.rural && selectedChecks.area;
+    let locating: ProgressReporter | undefined;
+    let ruralCheck: ProgressReporter | undefined;
+    let areaCheck: ProgressReporter | undefined;
+    if (runConcurrently) {
+      locating = reportProgressTo(event, "rural", summary.rowCount);
+      const combined = reportProgressTo(event, "area", summary.rowCount * 2);
+      let ruralDone = 0;
+      let areaDone = 0;
+      ruralCheck = (completed: number): void => {
+        ruralDone = completed;
+        combined(ruralDone + areaDone);
+      };
+      areaCheck = (completed: number): void => {
+        areaDone = completed;
+        combined(ruralDone + areaDone);
+      };
+    } else if (selectedChecks.rural) {
+      [locating, ruralCheck] = createPassReporters(2, summary.rowCount, reportProgressTo(event, "rural", summary.rowCount));
+    } else if (selectedChecks.area) {
+      [locating, areaCheck] = createPassReporters(2, summary.rowCount, reportProgressTo(event, "area", summary.rowCount));
+    }
+
+    const { located, unlocated } = await locateRows(verifiedRows, eligibility.geocoder, {
+      seeds: smartyLocations.get(summary.fileName),
+      onProgress: locating,
+    });
+    const [zone, benefit] = await Promise.all([
+      selectedChecks.rural
+        ? eligibility.zone.checkZoneBatch(located, ruralCheck)
+        : Promise.resolve(new Map<number, CheckOutcome<RuralResult>>()),
+      selectedChecks.area
+        ? eligibility.benefit.checkBenefitBatch(located, areaCheck)
+        : Promise.resolve(new Map<number, CheckOutcome<AreaEligibilityResult>>()),
+    ]);
+
+    const report = buildEligibilityReport({
+      fileName: summary.fileName,
+      located,
+      unlocated,
+      unverified,
+      zone,
+      benefit,
+      skipped,
+      checks: selectedChecks,
+    });
+    const eligibilityByRow = new Map(report.rows.map((row) => [row.rowNumber, row]));
+    const annotations = report.rows.map((row) =>
+      toResultAnnotation(
+        row.rowNumber,
+        verifications.get(row.rowNumber) ?? { status: "unverified" },
+        selectedChecks,
+        eligibilityByRow.get(row.rowNumber),
+      ),
+    );
+    // Cache annotations so the user can download them on demand; never write in place.
+    lastAnnotations.set(summary.fileName, { annotations, checks: selectedChecks });
     return report;
+  });
+
+  ipcMain.handle("results:export", async (event, input: unknown): Promise<unknown> => {
+    assertTrustedSender(event);
+    if (typeof input !== "object" || input === null) {
+      throw new Error("Export request is invalid.");
+    }
+    const { fileName } = input as { fileName?: unknown };
+    const summary = requireOpenedSpreadsheet(openedSpreadsheets, fileName);
+    const cached = lastAnnotations.get(summary.fileName);
+    if (cached === undefined) {
+      throw new Error("Run the checks again before downloading results.");
+    }
+
+    const suggestedName = summary.fileName.replace(/\.(xlsx|xlsm|xls)$/i, "") + "-results.xlsx";
+    const selection = await dialog.showSaveDialog({
+      title: "Save results spreadsheet",
+      defaultPath: suggestedName,
+      filters: [{ name: "Excel workbook", extensions: ["xlsx"] }],
+    });
+    if (selection.canceled || selection.filePath === undefined) {
+      return { canceled: true };
+    }
+
+    await reader.annotateResults(summary.filePath, cached.annotations, {
+      columns: RESULT_COLUMNS,
+      includeRural: cached.checks.rural,
+      includeArea: cached.checks.area,
+      outputPath: selection.filePath,
+    });
+    exportedPaths.set(summary.fileName, selection.filePath);
+    return { canceled: false, filePath: selection.filePath, rowsAnnotated: cached.annotations.length };
+  });
+
+  /* Reveals the exported copy in the OS file manager. The path is looked up here by
+     file name, so it never has to travel through the renderer. */
+  ipcMain.handle("results:reveal", (event, fileName: unknown): void => {
+    assertTrustedSender(event);
+    const summary = requireOpenedSpreadsheet(openedSpreadsheets, fileName);
+    const exportedPath = exportedPaths.get(summary.fileName);
+    if (exportedPath === undefined) {
+      throw new Error("Export the results before opening them.");
+    }
+    shell.showItemInFolder(exportedPath);
   });
 
   ipcMain.handle("settings:get-status", async (event): Promise<unknown> => {

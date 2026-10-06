@@ -1,5 +1,6 @@
 import type {
   AppAccessibilitySettings,
+  CachedCheckSelection,
   CredentialInput,
   CredentialStatus,
   Preferences,
@@ -17,6 +18,8 @@ export interface SettingsPanelPorts {
   updatePreferences(patch: Partial<Preferences>): Promise<void>;
   /** Adopts preferences returned by a direct bridge call, such as a delete. */
   adoptPreferences(next: Preferences): void;
+  /** Mirrors new check defaults onto the Checks step so both agree. */
+  applyCheckDefaults(selection: CachedCheckSelection): void;
   /** Mirrors newly saved header cells onto the Map columns step so both agree. */
   applyColumnDefaults(): void;
 }
@@ -279,6 +282,24 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
       .catch(reportOn(columnsMessage));
   });
 
+  /* USDA check defaults, which pre-select the Checks step. */
+  const openChecksButton = getRequiredElement<HTMLButtonElement>("#open-checks");
+  const preferredChecks = {
+    rural: getRequiredElement<HTMLInputElement>("#pref-rural"),
+    area: getRequiredElement<HTMLInputElement>("#pref-area"),
+  };
+  createDialog("#checks-overlay", openChecksButton, { closeLabel: "Close USDA checks" });
+
+  for (const [name, input] of Object.entries(preferredChecks)) {
+    input.addEventListener("change", (): void => {
+      const next = { ...ports.getPreferences().checkSelection, [name]: input.checked };
+      void ports
+        .updatePreferences({ checkSelection: next })
+        .then((): void => ports.applyCheckDefaults(ports.getPreferences().checkSelection))
+        .catch(reportError);
+    });
+  }
+
   /* Appearance and accessibility. */
   const themeSelect = getRequiredElement<HTMLSelectElement>("#theme-select");
   const highContrast = getRequiredElement<HTMLInputElement>("#high-contrast");
@@ -309,6 +330,8 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
       themeSelect.value = current.accessibility.theme;
       highContrast.checked = current.accessibility.highContrast;
       reduceMotion.checked = current.accessibility.reduceMotion;
+      preferredChecks.rural.checked = current.checkSelection.rural;
+      preferredChecks.area.checked = current.checkSelection.area;
       renderCellFields();
     },
     openCredentials(): void {

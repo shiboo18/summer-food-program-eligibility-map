@@ -1,29 +1,65 @@
-import type { AreaEligibilityChecker, JsonHttpClient } from "../../contracts.js";
-import type { AreaEligibility, AreaEligibilityResult, GeoPoint } from "../../types/eligibility.js";
+import type { HttpGetClient, SummerMealBenefitChecker } from "../../contracts.js";
+import type {
+  AreaEligibility,
+  AreaEligibilityResult,
+  CheckOutcome,
+  GeoPoint,
+  LocatedRow,
+} from "../../types/eligibility.js";
+import type { ProgressReporter } from "../../types/progress.js";
 import {
   AREA_ELIGIBILITY_FIELD,
-  AREA_ELIGIBILITY_LAYER_URL,
   AREA_ELIGIBILITY_VALUES,
   AREA_EVIDENCE_FIELDS,
+  USDA_CHECK_CONCURRENCY,
 } from "../../config/constants.js";
-import { FetchJsonHttpClient } from "../http/fetch-json-http-client.js";
+import { mapWithConcurrency } from "../../core/run/concurrency.js";
+import { coordinateKey } from "../../core/run/geocode-quality.js";
 
 const evidenceFieldNames = Object.values(AREA_EVIDENCE_FIELDS);
 const outFields = [AREA_ELIGIBILITY_FIELD, ...evidenceFieldNames].join(",");
 
 /**
- * Determines the 3-state USDA area eligibility for a coordinate by intersecting
- * it against the SFSP block-group layer and reading the `FY26_Eligibility`
- * field (Eligible / Averaged Eligible / Not Eligible). Returns `unknown` when
- * no block group contains the point.
+ * Determines the 3-state USDA area eligibility for each point by intersecting it
+ * against the SFSP block-group layer and reading the `FY26_Eligibility` field
+ * (Eligible / Averaged Eligible / Not Eligible). A point no block group contains
+ * is `unknown` rather than a failure: the map simply has nothing to say about it.
  */
-export class UsdaAreaEligibilityChecker implements AreaEligibilityChecker {
-  public constructor(private readonly http: JsonHttpClient = new FetchJsonHttpClient()) {}
+export class UsdaSummerMealBenefitChecker implements SummerMealBenefitChecker {
+  public constructor(private readonly http: HttpGetClient) {}
 
-  public async check(point: GeoPoint): Promise<AreaEligibilityResult> {
+  public async checkBenefitBatch(
+    rows: readonly LocatedRow[],
+    onProgress?: ProgressReporter,
+  ): Promise<ReadonlyMap<number, CheckOutcome<AreaEligibilityResult>>> {
+    /* Rows at the same coordinate share one in-flight lookup, so a duplicate
+       never issues its own request and takes the first row's outcome — including
+       a failure, which is therefore reported alike rather than retried. Scoped to
+       this call, so there is no state to invalidate between runs. */
+    const byCoordinate = new Map<string, Promise<AreaEligibilityResult>>();
+    const outcomes = await mapWithConcurrency(
+      rows,
+      USDA_CHECK_CONCURRENCY,
+      async (row) => {
+        const key = coordinateKey(row.geocode.point);
+        let pending = byCoordinate.get(key);
+        if (pending === undefined) {
+          pending = this.areaEligibilityAt(row.geocode.point);
+          byCoordinate.set(key, pending);
+        }
+        return pending;
+      },
+      onProgress,
+    );
+    return new Map(
+      rows.map((row, index) => [row.rowNumber, outcomes[index] as CheckOutcome<AreaEligibilityResult>]),
+    );
+  }
+
+  private async areaEligibilityAt(point: GeoPoint): Promise<AreaEligibilityResult> {
     let payload: unknown;
     try {
-      payload = await this.http.getJson(`${AREA_ELIGIBILITY_LAYER_URL}/query`, {
+      payload = await this.http.get("query", {
         geometry: `${point.lng},${point.lat}`,
         geometryType: "esriGeometryPoint",
         inSR: "4326",

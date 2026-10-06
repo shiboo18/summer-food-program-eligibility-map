@@ -1,9 +1,9 @@
 import type {
   ColumnMapping,
   CredentialStatus,
-  EligibilityChecks,
   EligibilityReport,
   Preferences,
+  RunPhase,
   RunProgress,
   ValidationReport,
 } from "../../../backend/dist/index.js";
@@ -18,16 +18,21 @@ import {
   preferredHeader,
   type AddressField,
 } from "../../../backend/dist/core/address-fields.js";
-import { defaultPreferences } from "../../../backend/dist/types/preferences.js";
-import { getRequiredElement } from "./dom.js";
-import { createBackgroundQueue } from "./workflow/background-queue.js";
 import {
   canRunChecks,
   resolveCheckControls,
   selectedEligibilityChecks,
   type EligibilityCheckSelection,
-} from "./workflow/eligibility-checks.js";
-import { areaLabel, isReady, readyLabel, ruralLabel, verifyLabel } from "./workflow/eligibility-format.js";
+} from "../../../backend/dist/core/eligibility-checks.js";
+import {
+  activeRunPhases,
+  runPhaseCopy,
+  runPhaseSteps,
+  runProgressView,
+} from "../../../backend/dist/core/run-progress.js";
+import { defaultPreferences } from "../../../backend/dist/types/preferences.js";
+import { getRequiredElement } from "./dom.js";
+import { createBackgroundQueue } from "./workflow/background-queue.js";
 import { createSettingsPanel } from "./settings/settings-panel.js";
 import { singleFlight } from "./workflow/single-flight.js";
 import { workflowSteps } from "./workflow/steps/index.js";
@@ -86,15 +91,6 @@ const excelFileSpinner = getRequiredElement<HTMLElement>("#excel-file-spinner");
 const mappingForm = getRequiredElement<HTMLFormElement>("#mapping-form");
 const formMessage = getRequiredElement<HTMLElement>("#form-message");
 const resultsStats = getRequiredElement<HTMLElement>("#results-stats");
-const resultsBody = getRequiredElement<HTMLElement>("#results-body");
-const checksSection = getRequiredElement<HTMLElement>("#checks-section");
-const checkInputs = {
-  addressValidation: getRequiredElement<HTMLInputElement>("#check-address-validation"),
-  rural: getRequiredElement<HTMLInputElement>("#check-rural"),
-  area: getRequiredElement<HTMLInputElement>("#check-area"),
-};
-const runChecksButton = getRequiredElement<HTMLButtonElement>("#run-checks");
-const checksMessage = getRequiredElement<HTMLElement>("#checks-message");
 const processingSection = getRequiredElement<HTMLElement>("#processing-section");
 const processingBar = getRequiredElement<HTMLElement>("#processing-bar");
 const processingBarFill = getRequiredElement<HTMLElement>("#processing-bar-fill");
@@ -102,8 +98,22 @@ const processingPercent = getRequiredElement<HTMLElement>("#processing-percent")
 const processingCount = getRequiredElement<HTMLElement>("#processing-count");
 const processingStatus = getRequiredElement<HTMLElement>("#processing-status");
 const processingPrivacy = getRequiredElement<HTMLElement>("#processing-privacy");
+const runSteps = getRequiredElement<HTMLOListElement>("#run-steps");
+/** The phases this run passes through, set when a run starts so the bar and stepper agree. */
+let activeRunPhaseList: readonly RunPhase[] = [];
 const appHeader = getRequiredElement<HTMLElement>(".app-header");
 const workflowSidebar = getRequiredElement<HTMLElement>(".workflow-sidebar");
+const checksSection = getRequiredElement<HTMLElement>("#checks-section");
+
+const checkInputs = {
+  addressValidation: getRequiredElement<HTMLInputElement>("#check-address-validation"),
+  rural: getRequiredElement<HTMLInputElement>("#check-rural"),
+  area: getRequiredElement<HTMLInputElement>("#check-area"),
+};
+const runChecksButton = getRequiredElement<HTMLButtonElement>("#run-checks");
+const runChecksSpinner = getRequiredElement<HTMLElement>("#run-checks-spinner");
+const runChecksLabel = getRequiredElement<HTMLElement>("#run-checks-label");
+const checksMessage = getRequiredElement<HTMLElement>("#checks-message");
 
 const mappingSelects = Object.fromEntries(
   addressFields.map(({ field }) => [field, getRequiredElement<HTMLSelectElement>(`#map-${field}`)]),
@@ -113,8 +123,8 @@ type Stage = "upload" | "map-columns" | "checks" | "results";
 let stage: Stage = "upload";
 let selectedSpreadsheet: SpreadsheetSelection | null = null;
 let lastReport: ValidationReport | null = null;
-/** The USDA checks the last run made, so the export message can name their columns. */
-let lastChecks: EligibilityChecks | null = null;
+let lastEligibility: EligibilityReport | null = null;
+let lastChecks: { readonly rural: boolean; readonly area: boolean } | null = null;
 
 const workflowStepList = getRequiredElement<HTMLOListElement>("#workflow-steps");
 
@@ -213,9 +223,6 @@ function goToStage(next: Stage): void {
      it reflects cells edited in the dialog and a file loaded since. */
   if (next === "map-columns" && selectedSpreadsheet !== null) {
     renderMapping(selectedSpreadsheet);
-  }
-  if (next === "checks") {
-    syncCheckControls();
   }
   stage = next;
   renderWorkflow();
@@ -345,12 +352,11 @@ function currentMapping(): ColumnMapping {
 }
 
 /**
- * Moves from the mapping screen to the checks screen, saving the chosen columns
- * behind it.
+ * Moves on from the mapping screen, saving the chosen columns behind it.
  *
  * The cells are read from the selects now and written in the background, so the
- * store is never what the partner waits on. Nothing later reads the saved cells —
- * the run takes its mapping from the selects.
+ * next screen opens without waiting on the store. Nothing later reads the saved
+ * cells — the run takes its mapping from the selects.
  */
 function finishMapColumns(): void {
   if (selectedSpreadsheet === null) {
@@ -370,44 +376,6 @@ function finishMapColumns(): void {
 mappingForm.addEventListener("submit", (event): void => {
   event.preventDefault();
   finishMapColumns();
-});
-
-/* USDA eligibility checks (Module 3). */
-function currentCheckSelection(): EligibilityCheckSelection {
-  return {
-    addressValidation: checkInputs.addressValidation.checked,
-    rural: checkInputs.rural.checked,
-    area: checkInputs.area.checked,
-  };
-}
-
-/** Keeps the USDA checkboxes and the run button in step with the selection rule. */
-function syncCheckControls(): void {
-  const selection = currentCheckSelection();
-  const controls = resolveCheckControls(selection);
-  checkInputs.rural.disabled = !controls.ruralEnabled;
-  checkInputs.area.disabled = !controls.areaEnabled;
-  if (!controls.ruralEnabled) {
-    checkInputs.rural.checked = false;
-  }
-  if (!controls.areaEnabled) {
-    checkInputs.area.checked = false;
-  }
-  runChecksButton.disabled = !canRunChecks(currentCheckSelection());
-}
-
-for (const input of [checkInputs.addressValidation, checkInputs.rural, checkInputs.area]) {
-  input.addEventListener("change", syncCheckControls);
-}
-
-/*
- * The run button can be pressed again while a run is already going, which would
- * pass a second run through.
- */
-const runChecks = singleFlight(performRun);
-
-runChecksButton.addEventListener("click", (): void => {
-  void runChecks();
 });
 
 /*
@@ -434,6 +402,52 @@ for (const { field } of addressFields) {
   });
 }
 
+/* USDA eligibility checks (Module 3). */
+function currentCheckSelection(): EligibilityCheckSelection {
+  return {
+    addressValidation: checkInputs.addressValidation.checked,
+    rural: checkInputs.rural.checked,
+    area: checkInputs.area.checked,
+  };
+}
+
+/** Keeps the USDA checkboxes and the run button in step with the selection rule. */
+function syncCheckControls(): void {
+  const selection = currentCheckSelection();
+  const controls = resolveCheckControls(selection);
+  checkInputs.rural.disabled = !controls.ruralEnabled;
+  checkInputs.area.disabled = !controls.areaEnabled;
+  if (!controls.ruralEnabled) {
+    checkInputs.rural.checked = false;
+  }
+  if (!controls.areaEnabled) {
+    checkInputs.area.checked = false;
+  }
+  setRunChecksEnabled(canRunChecks(currentCheckSelection()));
+}
+
+function setRunChecksEnabled(enabled: boolean): void {
+  runChecksButton.disabled = !enabled;
+}
+
+for (const input of [checkInputs.addressValidation, checkInputs.rural, checkInputs.area]) {
+  input.addEventListener("change", syncCheckControls);
+}
+
+/** Pre-selects the optional checks, then normalizes anything the dependency rule disallows. */
+function applyCheckDefaults(selection: Preferences["checkSelection"]): void {
+  checkInputs.rural.checked = selection.rural;
+  checkInputs.area.checked = selection.area;
+  syncCheckControls();
+}
+
+function setRunChecksLoading(loading: boolean): void {
+  setRunChecksEnabled(!loading && canRunChecks(currentCheckSelection()));
+  runChecksButton.setAttribute("aria-busy", String(loading));
+  runChecksSpinner.hidden = !loading;
+  runChecksLabel.textContent = loading ? "Running checks" : "Run checks";
+}
+
 /**
  * Freezes navigation while a run is in flight, so the header and the step rail
  * cannot leave the run or reconfigure it mid-flight. The processing card stays
@@ -444,76 +458,16 @@ function setUiFrozen(frozen: boolean): void {
   workflowSidebar.toggleAttribute("inert", frozen);
 }
 
-function renderRunResults(report: ValidationReport, eligibility: EligibilityReport | null): void {
+function renderCombinedResults(validation: ValidationReport, eligibility: EligibilityReport): void {
   resetExportButton();
+  const deliverableCount = validation.verified + validation.corrected;
 
-  const stats: ResultStat[] = [
-    { value: report.total, label: "Rows checked", tone: "neutral" },
-    { value: report.verified, label: "Verified", tone: "good" },
-    { value: report.corrected, label: "Corrected", tone: "good" },
-    { value: report.failures.length, label: "Needs review", tone: "neutral" },
-  ];
-  if (eligibility !== null) {
-    stats.push(
-      { value: eligibility.ruralCount, label: "USDA rural", tone: "good" },
-      { value: eligibility.areaEligibleCount, label: "Area eligible", tone: "good" },
-      { value: eligibility.needingVerification, label: "Location unsure", tone: "neutral" },
-      { value: countReady(report, eligibility), label: "Ready to ship", tone: "good" },
-    );
-  }
-  renderResultsStats(stats);
-  renderEligibilityRows(report, eligibility);
-}
-
-/** Rows that are deliverable, confidently located, rural, and area-eligible. */
-function countReady(report: ValidationReport, eligibility: EligibilityReport): number {
-  const failedRows = new Set(report.failures.map((failure) => failure.rowNumber));
-  return eligibility.rows.filter((result) => isReady(result, !failedRows.has(result.rowNumber))).length;
-}
-
-/** One row per address with its USDA verdicts; nothing when no USDA check was chosen. */
-function renderEligibilityRows(report: ValidationReport, eligibility: EligibilityReport | null): void {
-  resultsBody.replaceChildren();
-  if (eligibility === null || eligibility.rows.length === 0) {
-    return;
-  }
-  const failureReasons = new Set(report.failures.map((failure) => failure.rowNumber));
-
-  const table = document.createElement("table");
-  table.className = "results-table";
-  const head = document.createElement("thead");
-  const headRow = document.createElement("tr");
-  for (const heading of ["Row", "Standardized address", "Deliv.", "Rural", "Area", "Ready", "Verify?"]) {
-    const cell = document.createElement("th");
-    cell.textContent = heading;
-    headRow.append(cell);
-  }
-  head.append(headRow);
-  const body = document.createElement("tbody");
-  for (const result of eligibility.rows) {
-    const row = document.createElement("tr");
-    if (result.needsVerification) {
-      row.dataset.state = "warning";
-    }
-    const deliverable = !failureReasons.has(result.rowNumber);
-    const cells = [
-      String(result.rowNumber),
-      result.matchedAddress ?? "—",
-      deliverable ? "Yes" : "No",
-      ruralLabel(result.rural?.designation),
-      areaLabel(result.area?.eligibility),
-      readyLabel(result, deliverable),
-      verifyLabel(result),
-    ];
-    for (const value of cells) {
-      const cell = document.createElement("td");
-      cell.textContent = value;
-      row.append(cell);
-    }
-    body.append(row);
-  }
-  table.append(head, body);
-  resultsBody.append(table);
+  renderResultsStats([
+    { value: eligibility.total, label: "Rows checked", tone: "neutral" },
+    { value: deliverableCount, label: "Deliverable", tone: "good" },
+    { value: eligibility.ruralCount, label: "USDA rural", tone: "neutral" },
+    { value: eligibility.areaEligibleCount, label: "USDA eligible", tone: "neutral" },
+  ]);
 }
 
 interface ResultStat {
@@ -539,31 +493,53 @@ function renderResultsStats(stats: readonly ResultStat[]): void {
   }
 }
 
-/** Opens the card with the bar animating until a count arrives. */
+/** Fills the stepper, marking the phase now running and the ones done or still to come. */
+function renderRunSteps(current: RunPhase): void {
+  runSteps.replaceChildren(
+    ...runPhaseSteps(activeRunPhaseList, current).map((step): HTMLLIElement => {
+      const item = document.createElement("li");
+      item.className = "run-step";
+      item.dataset.state = step.state;
+      item.textContent = step.label;
+      return item;
+    }),
+  );
+}
+
+/** Puts the card's words on the step now running, so it names one step at a time. */
+function showRunPhase(phase: RunPhase): void {
+  const copy = runPhaseCopy(phase);
+  processingStatus.textContent = copy.detail;
+  processingPrivacy.textContent = copy.privacy;
+  renderRunSteps(phase);
+}
+
+/** Opens the card on the first step, with the bar animating until a count arrives. */
 function startRunProgress(total: number): void {
-  showRunProgress({ completed: 0, total });
+  showRunProgress({ phase: "verifying", completed: 0, total });
 }
 
 function showRunProgress(progress: RunProgress): void {
-  const percent = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
-  const label = `${String(progress.completed)} of ${String(progress.total)} addresses checked`;
+  const view = runProgressView(progress, activeRunPhaseList);
+  showRunPhase(progress.phase);
 
-  /* Until a row is counted there is no position to show: Smarty answers a whole
-     batch of addresses in one request, so verification has nothing to report until
-     it is done. Leave the bar animating rather than parked at a figure it cannot
-     move off, and drop the value a screen reader would read as precise. */
+  /* A phase that has not counted a row yet has no position to show: Smarty answers
+     a whole batch of addresses in one request, so verification has nothing to
+     report until it is done. Leave the bar animating rather than parked at a
+     figure it cannot move off, and drop the value a screen reader would read as
+     precise. */
   const counting = progress.completed > 0;
   processingBar.dataset.state = counting ? "determinate" : "indeterminate";
   if (counting) {
-    processingBarFill.style.width = `${String(percent)}%`;
-    processingBar.setAttribute("aria-valuenow", String(percent));
+    processingBarFill.style.width = `${String(view.percent)}%`;
+    processingBar.setAttribute("aria-valuenow", String(view.percent));
   } else {
     processingBarFill.style.removeProperty("width");
     processingBar.removeAttribute("aria-valuenow");
   }
-  processingBar.setAttribute("aria-valuetext", label);
-  processingPercent.textContent = counting ? `${String(percent)}%` : "";
-  processingCount.textContent = label;
+  processingBar.setAttribute("aria-valuetext", view.label);
+  processingPercent.textContent = view.readout;
+  processingCount.textContent = view.label;
 }
 
 /* A report can still be in flight when a run lands or fails, so reports are only
@@ -574,13 +550,15 @@ bridge.run.onProgress((progress: RunProgress): void => {
   }
 });
 
-/**
- * Runs address validation, then whichever USDA checks were ticked. Validation
- * goes first because it produces the coordinate the USDA checks are made against.
- */
-async function performRun(): Promise<void> {
+async function performChecks(): Promise<void> {
   if (selectedSpreadsheet === null) {
     checksMessage.textContent = "Upload an Excel file first.";
+    checksMessage.dataset.state = "error";
+    return;
+  }
+  const selection = currentCheckSelection();
+  if (!canRunChecks(selection)) {
+    checksMessage.textContent = "Address validation is required.";
     checksMessage.dataset.state = "error";
     return;
   }
@@ -600,43 +578,63 @@ async function performRun(): Promise<void> {
     return;
   }
 
-  const checks = selectedEligibilityChecks(currentCheckSelection());
-  const mapping = currentMapping();
+  /* Saved behind the run rather than before it, so the store is never what the
+     partner waits on. */
+  savePreferences(() => ({ checkSelection: { rural: selection.rural, area: selection.area } }));
+
+  setRunChecksLoading(true);
   checksMessage.textContent = "";
   checksMessage.dataset.state = "idle";
+  lastChecks = selectedEligibilityChecks(selection);
+  activeRunPhaseList = activeRunPhases(lastChecks);
   startRunProgress(selectedSpreadsheet.rowCount);
-  processingStatus.textContent = "Checking each address with Smarty.";
-  processingPrivacy.textContent = "Only the address fields leave your computer.";
   checksSection.hidden = true;
   processingSection.hidden = false;
   setUiFrozen(true);
   try {
-    const report = await bridge.spreadsheet.validate(selectedSpreadsheet.fileName, mapping);
-    let eligibility: EligibilityReport | null = null;
-    if (checks.rural || checks.area) {
-      processingStatus.textContent = "Checking USDA eligibility for each located address.";
-      processingPrivacy.textContent =
-        "Some addresses are also sent to Esri to find their exact location. Esri makes ArcGIS, the mapping software USDA and many governments use.";
-      eligibility = await bridge.eligibility.check(selectedSpreadsheet.fileName, mapping, checks);
+    const mapping = currentMapping();
+    const validation = await bridge.spreadsheet.validate(selectedSpreadsheet.fileName, mapping);
+    /* Moved on as soon as verification lands rather than when the next step first
+       reports, so the bar never credits reading the sheet again to the step behind it. */
+    const firstUsdaPhase = activeRunPhaseList[1];
+    if (firstUsdaPhase !== undefined) {
+      showRunProgress({ phase: firstUsdaPhase, completed: 0, total: selectedSpreadsheet.rowCount });
     }
-    lastReport = report;
-    lastChecks = eligibility === null ? null : checks;
-    renderRunResults(report, eligibility);
+    const eligibility = await bridge.eligibility.check(
+      selectedSpreadsheet.fileName,
+      mapping,
+      selectedEligibilityChecks(selection),
+    );
+    lastReport = validation;
+    lastEligibility = eligibility;
+    renderCombinedResults(validation, eligibility);
     processingSection.hidden = true;
     goToStage("results");
   } catch (error: unknown) {
     processingSection.hidden = true;
-    renderWorkflow();
-    checksMessage.textContent = friendlyMessage(error, "The checks could not be run.");
+    checksSection.hidden = false;
+    checksMessage.textContent = friendlyMessage(error, "The checks failed.");
     checksMessage.dataset.state = "error";
   } finally {
     setUiFrozen(false);
+    setRunChecksLoading(false);
   }
 }
+
+/*
+ * The run button disables itself while a run is going, but the step rail can reach
+ * "Next: choose checks" again meanwhile, which would pass a second run through.
+ */
+const runChecks = singleFlight(performChecks);
+
+runChecksButton.addEventListener("click", (): void => {
+  void runChecks();
+});
 
 getRequiredElement<HTMLButtonElement>("#start-over").addEventListener("click", (): void => {
   selectedSpreadsheet = null;
   lastReport = null;
+  lastEligibility = null;
   setFileStatus("", "idle");
   goToStage("upload");
 });
@@ -683,9 +681,9 @@ function renderExportMessage(filePath: string): void {
   const added: readonly { readonly label: string; readonly note?: string }[] = [
     { label: "Standardized Address", note: "corrected rows only" },
     { label: "Address Checks" },
+    { label: "Address Match Level" },
     ...(lastChecks?.rural === true ? [{ label: "USDA Rural" }] : []),
-    ...(lastChecks?.area === true ? [{ label: "USDA Area Eligibility" }] : []),
-    ...(lastChecks !== null && (lastChecks.rural || lastChecks.area) ? [{ label: "Ready to Ship" }] : []),
+    ...(lastChecks?.area === true ? [{ label: "USDA Eligibility" }] : []),
   ];
 
   const lead = document.createElement("p");
@@ -707,7 +705,7 @@ function renderExportMessage(filePath: string): void {
 }
 
 async function exportResults(): Promise<void> {
-  if (selectedSpreadsheet === null || lastReport === null) {
+  if (selectedSpreadsheet === null || lastEligibility === null) {
     return;
   }
   setDownloadLoading(true);
@@ -760,6 +758,7 @@ const settingsPanel = createSettingsPanel({
     preferences = next;
     applyAppearance();
   },
+  applyCheckDefaults,
   applyColumnDefaults: (): void => {
     if (selectedSpreadsheet !== null) {
       renderMapping(selectedSpreadsheet);
@@ -870,6 +869,7 @@ async function initialize(): Promise<void> {
   settingsPanel.refresh();
   renderWorkflow();
   renderHomeSteps();
+  applyCheckDefaults(preferences.checkSelection);
   showView("home");
 }
 
