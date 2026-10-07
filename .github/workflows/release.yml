@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+  # Packaging changes build the installers on the pull request too, so a broken
+  # build is caught before anyone tags a release.
+  pull_request:
+    paths:
+      - .github/workflows/release.yml
+      - electron-builder.yml
+      - scripts/fix-smarty-tslib.mjs
+
+permissions:
+  contents: read
+
+jobs:
+  installers:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+
+      # The installers are named from package.json's version, so a tag that
+      # disagrees with it would publish v0.2.0 files under a v0.3.0 release.
+      - name: Check the tag matches the package version
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          expected="v$(node -p "require('./package.json').version")"
+          if [ "$GITHUB_REF_NAME" != "$expected" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match package.json version ($expected)."
+            exit 1
+          fi
+
+      - run: npm ci
+
+      # Builds the universal macOS dmg and zip and cross-builds the Windows
+      # installer. Both are unsigned: no certificates are configured.
+      - run: npm run package
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: installers
+          path: |
+            build/electron/*.dmg
+            build/electron/*.zip
+            build/electron/*.exe
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: installers
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: installers
+          path: installers
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >
+          gh release create "$GITHUB_REF_NAME" installers/*
+          --repo "$GITHUB_REPOSITORY"
+          --title "vibeCheck $GITHUB_REF_NAME"
+          --generate-notes
