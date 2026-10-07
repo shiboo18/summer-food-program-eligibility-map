@@ -93,3 +93,7 @@ Limitation: the source PNG is 512x512. macOS `.icns` therefore tops out at
 the largest size is not as crisp as a native 1024 px source would allow. Supply
 a 1024x1024 source and regenerate `icon.icns` to remove this limitation. The
 in-app renderer icons are unchanged; the packaging icons are separate assets.
+
+## License
+
+MIT. See [LICENSE](LICENSE).
