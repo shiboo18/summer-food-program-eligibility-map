@@ -50,6 +50,10 @@ files:
 
 artifactName: "vibeCheck-${version}-${arch}.${ext}"
 
+# The release workflow publishes the installers; electron-builder must not
+# upload them itself when it sees a tag in CI.
+publish: null
+
 mac:
   # Unsigned local artifacts by default: no certificate, no notarization.
   # Gatekeeper will warn on first launch. To sign later, add a Developer ID
