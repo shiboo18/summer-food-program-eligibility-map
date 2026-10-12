@@ -4,7 +4,7 @@
   "version": "0.1.0",
   "description": "vibeCheck desktop address validation tool.",
   "author": "Share Our Strength with Amazon",
-  "license": "UNLICENSED",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/shiboo18/summer-food-program-eligibility-map.git"
