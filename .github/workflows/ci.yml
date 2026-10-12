@@ -22,6 +22,16 @@ jobs:
       - run: npm ci
       - run: npm run build
       - run: npm test
+
+      - name: Coverage summary
+        run: node scripts/coverage-summary.mjs >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: coverage-report
+          path: build/coverage
+          retention-days: 14
+
       - run: npm run typecheck:tests
 
       # Electron needs a display even in smoke-test mode, which never shows a
