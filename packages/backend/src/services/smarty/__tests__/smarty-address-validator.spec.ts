@@ -168,7 +168,7 @@ describe("SmartyAddressValidator", () => {
     const validator = new SmartyAddressValidator(async () => undefined, createClient);
 
     await expect(validator.validate([address("1 Main St")])).rejects.toThrow(
-      "Configure Smarty AUTH_ID and AUTH_TOKEN in Settings before verifying.",
+      "Add your Smarty secret key in Settings before running checks.",
     );
     expect(createClient).not.toHaveBeenCalled();
     await expect(validator.validate([])).resolves.toEqual([]);

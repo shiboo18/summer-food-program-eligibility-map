@@ -1,5 +1,6 @@
 import { describe, expect, test } from "vitest";
 
+import { SMARTY_API_KEYS_URL } from "../../../../backend/dist/config/constants.js";
 import { isAllowedExternalLink, isAllowedNavigation } from "../navigation.js";
 
 describe("isAllowedNavigation", () => {
@@ -16,10 +17,18 @@ describe("isAllowedNavigation", () => {
 });
 
 describe("isAllowedExternalLink", () => {
-  test("allows the Smarty secret-key link", () => {
-    expect(
-      isAllowedExternalLink("https://www.smarty.com/account/keys?account_id=17430621318&tab=secret"),
-    ).toBe(true);
+  test("allows the link to the partner's Smarty keys", () => {
+    const allowed = isAllowedExternalLink(SMARTY_API_KEYS_URL);
+
+    expect(allowed).toBe(true);
+  });
+
+  /* An account id in the link would send every partner to one account's keys. */
+  test("links to whichever Smarty account the partner signs in to", () => {
+    const link = new URL(SMARTY_API_KEYS_URL);
+
+    expect(`${link.origin}${link.pathname}`).toBe("https://www.smarty.com/account/keys");
+    expect(link.searchParams.has("account_id")).toBe(false);
   });
 
   test.each([

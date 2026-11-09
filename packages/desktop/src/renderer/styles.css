@@ -880,12 +880,14 @@ p {
   gap: 12px;
 }
 
-/* The way to the key partners need, so it reads at body size, not as a footnote. */
-.provider-fields-head a {
+/* The way to the key partners need, so it is a button rather than a footnote link. */
+.smarty-keys-button {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
   color: var(--accent-strong);
-  font-size: 0.95rem;
-  font-weight: 700;
-  text-underline-offset: 4px;
+  font-size: 0.9rem;
+  text-decoration: none;
 }
 
 .settings-subhead {

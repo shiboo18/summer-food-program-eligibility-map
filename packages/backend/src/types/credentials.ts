@@ -1,3 +1,12 @@
+/** How the store and the credentials form name each half of a Smarty key. */
+export type SmartyCredentialField = "smartyAuthId" | "smartyAuthToken";
+
+/** The halves as the credentials form sends them or the store holds them; either may be missing. */
+export type CredentialInput = Readonly<Partial<Record<SmartyCredentialField, string>>>;
+
+/** Which halves of the key are stored. Never carries the values themselves. */
+export type CredentialStatus = Readonly<Record<SmartyCredentialField, boolean>>;
+
 /** A whole Smarty secret key, trimmed. Half a key cannot be used, so there is no partial form. */
 export interface SmartyCredentials {
   readonly authId: string;

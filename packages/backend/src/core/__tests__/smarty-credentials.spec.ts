@@ -2,7 +2,12 @@ import { describe, expect, test, vi } from "vitest";
 
 import type { CredentialVerifier } from "../../contracts.js";
 import type { CredentialVerification, SmartyCredentials } from "../../types/credentials.js";
-import { checkStoredCredentials, saveAcceptedCredentials, toSmartyCredentials } from "../smarty-credentials.js";
+import {
+  checkStoredCredentials,
+  saveAcceptedCredentials,
+  toCredentialInput,
+  toSmartyCredentials,
+} from "../smarty-credentials.js";
 
 function verifierAnswering(verification: CredentialVerification): CredentialVerifier & {
   verify: ReturnType<typeof vi.fn>;
@@ -13,21 +18,35 @@ function verifierAnswering(verification: CredentialVerification): CredentialVeri
 const key: SmartyCredentials = { authId: "id", authToken: "token" };
 
 describe("toSmartyCredentials", () => {
-  test("trims both halves into a whole key", () => {
-    const credentials = toSmartyCredentials("  id ", "\ttoken\n");
+  test("trims both stored or typed halves into a whole key", () => {
+    const credentials = toSmartyCredentials({ smartyAuthId: "  id ", smartyAuthToken: "\ttoken\n" });
 
     expect(credentials).toEqual({ authId: "id", authToken: "token" });
   });
 
   test.each([
-    { case: "both halves are absent", authId: undefined, authToken: undefined },
-    { case: "the Auth ID is empty", authId: "", authToken: "token" },
-    { case: "the Auth Token is absent", authId: "id", authToken: undefined },
-    { case: "the Auth ID is only whitespace", authId: " \t ", authToken: "token" },
-  ])("is undefined when $case", ({ authId, authToken }) => {
-    const credentials = toSmartyCredentials(authId, authToken);
+    { case: "both halves are absent", input: {} },
+    { case: "the Auth ID is empty", input: { smartyAuthId: "", smartyAuthToken: "token" } },
+    { case: "the Auth Token is absent", input: { smartyAuthId: "id" } },
+    { case: "the Auth ID is only whitespace", input: { smartyAuthId: " \t ", smartyAuthToken: "token" } },
+  ])("is undefined when $case", ({ input }) => {
+    const credentials = toSmartyCredentials(input);
 
     expect(credentials).toBeUndefined();
+  });
+});
+
+describe("toCredentialInput", () => {
+  test("names each half the way the store and the form do", () => {
+    const input = toCredentialInput({ authId: "id", authToken: "token" });
+
+    expect(input).toEqual({ smartyAuthId: "id", smartyAuthToken: "token" });
+  });
+
+  test("round-trips through toSmartyCredentials unchanged", () => {
+    const roundTripped = toSmartyCredentials(toCredentialInput(key));
+
+    expect(roundTripped).toEqual(key);
   });
 });
 

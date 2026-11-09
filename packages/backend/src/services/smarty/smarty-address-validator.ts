@@ -62,7 +62,7 @@ export class SmartyAddressValidator implements AddressValidator {
   private async getAndResolveCredentials(): Promise<SmartyCredentials> {
     const credentials = await this.getCredentials();
     if (credentials === undefined) {
-      throw new Error("Configure Smarty AUTH_ID and AUTH_TOKEN in Settings before verifying.");
+      throw new Error("Add your Smarty secret key in Settings before running checks.");
     }
     return credentials;
   }

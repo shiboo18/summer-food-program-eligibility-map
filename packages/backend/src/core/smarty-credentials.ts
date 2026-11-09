@@ -1,17 +1,27 @@
 import type { CredentialVerifier } from "../contracts.js";
-import type { CredentialCheck, CredentialVerification, SmartyCredentials } from "../types/credentials.js";
+import type {
+  CredentialCheck,
+  CredentialInput,
+  CredentialVerification,
+  SmartyCredentials,
+} from "../types/credentials.js";
 
 /** Shown wherever a save is attempted without a whole key. */
 export const INCOMPLETE_KEY_MESSAGE = "Enter both the Auth ID and the Auth Token.";
 
-/** Builds a whole key from its two halves, trimmed; `undefined` when either half is blank or absent. */
-export function toSmartyCredentials(
-  authId: string | undefined,
-  authToken: string | undefined,
-): SmartyCredentials | undefined {
-  const id = authId?.trim() ?? "";
-  const token = authToken?.trim() ?? "";
-  return id && token ? { authId: id, authToken: token } : undefined;
+/**
+ * Builds a whole key from the halves the form sent or the store holds, trimmed;
+ * `undefined` when either half is blank or absent. The one way halves become a key.
+ */
+export function toSmartyCredentials(input: CredentialInput): SmartyCredentials | undefined {
+  const authId = input.smartyAuthId?.trim() ?? "";
+  const authToken = input.smartyAuthToken?.trim() ?? "";
+  return authId && authToken ? { authId, authToken } : undefined;
+}
+
+/** Names a key's halves the way the store and the form do; the reverse of `toSmartyCredentials`. */
+export function toCredentialInput({ authId, authToken }: SmartyCredentials): CredentialInput {
+  return { smartyAuthId: authId, smartyAuthToken: authToken };
 }
 
 /** Reports the stored key's state for the renderer: not set, or Smarty's verdict, never the key. */

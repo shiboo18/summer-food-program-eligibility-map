@@ -2,11 +2,14 @@ import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
+import type {
+  CredentialInput,
+  CredentialStatus,
+  SmartyCredentialField as SmartyCredential,
+} from "../../types/credentials.js";
+
 /** The Smarty secrets this store holds. Every credential loop walks this list. */
-const smartyCredentials = ["smartyAuthId", "smartyAuthToken"] as const;
-type SmartyCredential = (typeof smartyCredentials)[number];
-export type CredentialInput = Readonly<Partial<Record<SmartyCredential, string>>>;
-export type CredentialStatus = Readonly<Record<SmartyCredential, boolean>>;
+const smartyCredentials: readonly SmartyCredential[] = ["smartyAuthId", "smartyAuthToken"];
 
 export interface SecretProtector {
   isEncryptionAvailable(): boolean;

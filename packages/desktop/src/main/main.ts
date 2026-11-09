@@ -21,6 +21,7 @@ import {
   parseColumnMapping,
   parseCredentialInput,
   saveAcceptedCredentials,
+  toCredentialInput,
   toSmartyCredentials,
   toResultAnnotation,
   type AddressRowsResult,
@@ -79,10 +80,7 @@ function createPreferencesService(): PreferencesService {
 type SmartyCredentialsProvider = () => Promise<SmartyCredentials | undefined>;
 
 function createSmartyCredentialsProvider(settings: SettingsStore): SmartyCredentialsProvider {
-  return async () => {
-    const stored = await settings.getCredentials();
-    return toSmartyCredentials(stored.smartyAuthId, stored.smartyAuthToken);
-  };
+  return async () => toSmartyCredentials(await settings.getCredentials());
 }
 
 /**
@@ -162,7 +160,7 @@ function requireOpenedSpreadsheet(
 
 function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesService): void {
   const reader = new ExcelSpreadsheetReader();
-  /* One read of the stored key, shared by the run and the background check. */
+  /* One provider of the stored key, shared by the run, the background check and saves. */
   const storedCredentials = createSmartyCredentialsProvider(settings);
   const validation = new SpreadsheetValidationService(reader, new SmartyAddressValidator(storedCredentials));
   const credentialVerifier = new SmartyCredentialVerifier();
@@ -379,10 +377,9 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
   });
   ipcMain.handle("settings:save", async (event, input: unknown): Promise<unknown> => {
     assertTrustedSender(event);
-    const typed = parseCredentialInput(input);
-    const outcome = await saveAcceptedCredentials(toSmartyCredentials(typed.smartyAuthId, typed.smartyAuthToken), {
-      store: async ({ authId, authToken }): Promise<void> => {
-        await settings.save({ smartyAuthId: authId, smartyAuthToken: authToken });
+    const outcome = await saveAcceptedCredentials(toSmartyCredentials(parseCredentialInput(input)), {
+      store: async (credentials): Promise<void> => {
+        await settings.save(toCredentialInput(credentials));
       },
       verifier: credentialVerifier,
     });

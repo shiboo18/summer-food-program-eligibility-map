@@ -28,6 +28,12 @@ export const RESULT_COLUMNS = {
 export const SMARTY_US_STREET_URL = "https://us-street.api.smarty.com/street-address";
 
 /**
+ * Smarty's API keys page, on its secret-key tab. It names no account, so it opens
+ * the keys of whichever account the partner signs in to.
+ */
+export const SMARTY_API_KEYS_URL = "https://www.smarty.com/account/keys?tab=secret";
+
+/**
  * How long a credential check waits for Smarty, in milliseconds. It runs in the
  * background on every launch, so a slow network should give up rather than hang.
  */

@@ -5,12 +5,7 @@ export * from "./contracts.js";
 export * from "./types/index.js";
 
 /* Adapters, grouped by the system they talk to. */
-export {
-  SettingsStore,
-  parseCredentialInput,
-  type CredentialInput,
-  type CredentialStatus,
-} from "./services/local/settings-store.js";
+export { SettingsStore, parseCredentialInput } from "./services/local/settings-store.js";
 export { AppPreferenceStore as PreferencesStore } from "./services/local/preferences-store.js";
 export { ExcelSpreadsheetReader } from "./services/local/excel-spreadsheet-reader.js";
 export { SmartyAddressValidator } from "./services/smarty/smarty-address-validator.js";
@@ -24,6 +19,7 @@ export { PreferencesService } from "./core/preferences-service.js";
 export {
   checkStoredCredentials,
   saveAcceptedCredentials,
+  toCredentialInput,
   toSmartyCredentials,
 } from "./core/smarty-credentials.js";
 export { SpreadsheetValidationService } from "./core/spreadsheet-validation-service.js";

@@ -2,7 +2,6 @@ import type {
   AppAccessibilitySettings,
   CachedCheckSelection,
   CredentialCheck,
-  CredentialInput,
   CredentialStatus,
   Preferences,
 } from "../../../../backend/dist/index.js";
@@ -10,7 +9,12 @@ import type {
    dependencies into the browser context. */
 import { addressFields, type AddressField } from "../../../../backend/dist/core/address-fields.js";
 import { followingCells, parseTypedCells } from "../../../../backend/dist/core/cell-mapping.js";
-import { INCOMPLETE_KEY_MESSAGE, toSmartyCredentials } from "../../../../backend/dist/core/smarty-credentials.js";
+import {
+  INCOMPLETE_KEY_MESSAGE,
+  toCredentialInput,
+  toSmartyCredentials,
+} from "../../../../backend/dist/core/smarty-credentials.js";
+import { SMARTY_API_KEYS_URL } from "../../../../backend/dist/config/constants.js";
 import { getRequiredElement } from "../dom.js";
 import { latestOnly } from "../workflow/latest-only.js";
 import { credentialFields, type SmartyCredential } from "./credential-fields.js";
@@ -40,7 +44,8 @@ export interface SettingsPanel {
   openCredentials(): void;
   /**
    * Shows which halves of the key are stored. Half a key or none reads as not
-   * set straight away; a whole key reads as checking until `checkCredentials`.
+   * set straight away; a whole key reads as checking until Smarty's verdict on
+   * it is shown.
    */
   showStoredCredentials(status: CredentialStatus): void;
   /** Asks Smarty about the stored key in the background; never rejects. */
@@ -70,6 +75,8 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   const settingsForm = getRequiredElement<HTMLFormElement>("#settings-form");
   const settingsMessage = getRequiredElement<HTMLElement>("#settings-message");
   const credentialInputs = new Map<SmartyCredential, HTMLInputElement>();
+  /* Opens in the partner's own browser, where they are already signed in. */
+  getRequiredElement<HTMLAnchorElement>("#open-smarty-keys").href = SMARTY_API_KEYS_URL;
 
   for (const { name, label } of credentialFields) {
     const caption = document.createElement("label");
@@ -160,17 +167,15 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     event.preventDefault();
     /* A save replaces the whole key, so both halves are needed every time. */
     const credentials = toSmartyCredentials(
-      credentialInputs.get("smartyAuthId")?.value,
-      credentialInputs.get("smartyAuthToken")?.value,
+      Object.fromEntries([...credentialInputs].map(([name, input]) => [name, input.value])),
     );
     if (credentials === undefined) {
       settingsMessage.textContent = INCOMPLETE_KEY_MESSAGE;
       settingsMessage.dataset.state = "error";
       return;
     }
-    const input: CredentialInput = { smartyAuthId: credentials.authId, smartyAuthToken: credentials.authToken };
     void bridge.settings
-      .save(input)
+      .save(toCredentialInput(credentials))
       .then(({ saved, check, status }): void => {
         if (!saved) {
           /* Nothing was stored, so the status still describes the key that is.
