@@ -9,11 +9,13 @@ import {
   RESULT_COLUMNS,
   SettingsStore,
   SmartyAddressValidator,
+  SmartyCredentialVerifier,
   SpreadsheetValidationService,
   USDA_RURAL_SERVICE_URL,
   UsdaRuralZoneMapChecker,
   UsdaSummerMealBenefitChecker,
   buildEligibilityReport,
+  checkStoredCredentials,
   createPassReporters,
   locateRows,
   parseColumnMapping,
@@ -30,6 +32,7 @@ import {
   type RunPhase,
   type RunProgress,
   type RuralResult,
+  type SmartyCredentials,
   type SpreadsheetSummary,
 } from "../../../backend/dist/index.js";
 import {
@@ -69,7 +72,7 @@ function createPreferencesService(): PreferencesService {
   return new PreferencesService(new PreferencesStore(join(app.getPath("userData"), "preferences.v1.json")));
 }
 
-type SmartyCredentialsProvider = () => Promise<{ authId: string | undefined; authToken: string | undefined }>;
+type SmartyCredentialsProvider = () => Promise<SmartyCredentials>;
 
 function createSmartyCredentialsProvider(settings: SettingsStore): SmartyCredentialsProvider {
   return async () => {
@@ -79,10 +82,6 @@ function createSmartyCredentialsProvider(settings: SettingsStore): SmartyCredent
       authToken: credentials.smartyAuthToken,
     };
   };
-}
-
-function createSmartyAddressValidator(settings: SettingsStore): SmartyAddressValidator {
-  return new SmartyAddressValidator(createSmartyCredentialsProvider(settings));
 }
 
 /**
@@ -162,7 +161,10 @@ function requireOpenedSpreadsheet(
 
 function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesService): void {
   const reader = new ExcelSpreadsheetReader();
-  const validation = new SpreadsheetValidationService(reader, createSmartyAddressValidator(settings));
+  /* One read of the stored key, shared by the run and the background check. */
+  const storedCredentials = createSmartyCredentialsProvider(settings);
+  const validation = new SpreadsheetValidationService(reader, new SmartyAddressValidator(storedCredentials));
+  const credentialVerifier = new SmartyCredentialVerifier();
   const eligibility = createEligibilityServices();
   /** Summaries are kept in the main process so the renderer never supplies a file path. */
   const openedSpreadsheets = new Map<string, SpreadsheetSummary>();
@@ -381,6 +383,10 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
   ipcMain.handle("settings:clear", async (event): Promise<unknown> => {
     assertTrustedSender(event);
     return settings.clear();
+  });
+  ipcMain.handle("settings:verify", async (event): Promise<unknown> => {
+    assertTrustedSender(event);
+    return checkStoredCredentials(storedCredentials, credentialVerifier);
   });
   ipcMain.handle("preferences:get", async (event): Promise<unknown> => {
     assertTrustedSender(event);

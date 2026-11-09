@@ -1,5 +1,6 @@
 import type {
   ColumnMapping,
+  CredentialCheck,
   CredentialInput,
   CredentialStatus,
   EligibilityChecks,
@@ -51,6 +52,8 @@ declare global {
         getStatus(): Promise<CredentialStatus>;
         save(input: CredentialInput): Promise<CredentialStatus>;
         clear(): Promise<CredentialStatus>;
+        /** Asks Smarty about the stored key. Resolves `"not-set"` without asking when half or all of it is missing. */
+        verify(): Promise<CredentialCheck>;
       };
       readonly preferences: {
         get(): Promise<Preferences>;
