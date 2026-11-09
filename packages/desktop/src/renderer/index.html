@@ -55,6 +55,7 @@
           area eligibility. <a id="home-settings-link" class="text-link" href="#" role="button">Open settings</a> to add
           your Smarty credentials.
         </p>
+        <p id="home-credential-notice" class="home-notice" role="status" hidden></p>
 
         <details class="privacy-note">
           <summary class="privacy-note-summary">🔒 Click to see the privacy note</summary>
@@ -241,7 +242,7 @@
               <button id="open-credentials" class="primary-button is-active" type="button">
                 Set Smarty credentials
               </button>
-              <span id="credential-status" class="settings-check" aria-live="polite"></span>
+              <span id="credential-status" class="credential-status" data-tone="pending" aria-live="polite"></span>
             </div>
           </div>
 
@@ -304,10 +305,11 @@
                 rel="noreferrer"
               >Open Link to see Secrets</a>
             </div>
+            <p id="credential-dialog-status" class="credential-status" data-tone="pending" aria-live="polite"></p>
             <div id="credential-fields" class="credential-fields"></div>
           </div>
 
-          <p class="settings-hint">Leave a field blank to keep its stored value.</p>
+          <p class="settings-hint">Enter both the Auth ID and the Auth Token. Saving replaces the stored key.</p>
           <div class="settings-actions">
             <button class="primary-button is-active" type="submit">Save securely</button>
             <button id="clear-settings" class="secondary-button" type="button">Clear stored credentials</button>

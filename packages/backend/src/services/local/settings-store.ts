@@ -135,7 +135,8 @@ export class SettingsStore {
   }
 }
 
-function parseCredentialInput(value: unknown): CredentialInput {
+/** Reads credentials sent from the renderer, rejecting anything that is not one. */
+export function parseCredentialInput(value: unknown): CredentialInput {
   if (typeof value !== "object" || value === null) {
     throw new Error("Credential settings are invalid.");
   }

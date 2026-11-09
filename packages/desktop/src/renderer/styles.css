@@ -176,6 +176,18 @@ p {
   line-height: 1.55;
 }
 
+.home-notice {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border: 1px solid var(--danger);
+  border-left-width: 3px;
+  border-radius: var(--radius-md);
+  color: var(--danger);
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
 .text-link {
   color: var(--accent-strong);
   font-weight: 600;
@@ -830,45 +842,50 @@ p {
   margin-top: var(--dialog-gap);
 }
 
-.settings-check {
+/* Smarty's verdict on the stored key. Colour carries the tone, the words carry
+   the meaning, so no glyph is needed and none reads as "done". */
+.credential-status {
   align-self: center;
-  font-size: 0.84rem;
-  font-weight: 700;
-}
-
-.settings-check[data-configured="true"] {
-  color: var(--success);
-  font-size: 1.05rem;
-}
-
-.settings-check[data-configured="false"] {
+  margin: 0;
   color: var(--text-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.credential-status[data-tone="pending"] {
   font-weight: 500;
 }
 
-.provider-fields-head,
-.credential-label {
+.credential-status[data-tone="success"] {
+  color: var(--success);
+}
+
+.credential-status[data-tone="warning"] {
+  color: var(--accent-strong);
+}
+
+.credential-status[data-tone="error"] {
+  color: var(--danger);
+}
+
+.provider-fields .credential-status {
+  margin-bottom: 10px;
+}
+
+.provider-fields-head {
   display: flex !important;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
+/* The way to the key partners need, so it reads at body size, not as a footnote. */
 .provider-fields-head a {
   color: var(--accent-strong);
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-underline-offset: 3px;
-}
-
-.credential-label strong {
-  color: var(--danger);
-  font-size: 0.68rem;
-  font-weight: 600;
-}
-
-.credential-label strong[data-configured="true"] {
-  color: var(--success);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-underline-offset: 4px;
 }
 
 .settings-subhead {

@@ -11,7 +11,7 @@ export interface CredentialFieldDescriptor {
 
 /**
  * The credential fields in form order. This one table drives the inputs, their
- * configured/not-configured status, and the values sent to the encrypted store.
+ * stored-value placeholders, and the values sent to the encrypted store.
  * Values are never read back out, so these are always password inputs.
  */
 export const credentialFields: readonly CredentialFieldDescriptor[] = [

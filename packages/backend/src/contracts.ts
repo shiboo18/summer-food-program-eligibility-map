@@ -5,7 +5,7 @@
  */
 
 import type { Address, AddressVerificationResult } from "./types/address.js";
-import type { CredentialVerification } from "./types/credentials.js";
+import type { ResolvedSmartyCredentials, SmartyCredentials } from "./types/credentials.js";
 import type {
   AreaEligibilityResult,
   CheckOutcome,
@@ -41,10 +41,10 @@ export interface AddressValidator {
  */
 export interface CredentialVerifier {
   /**
-   * Resolves with the provider's answer. Never rejects: a network failure or an
-   * unexpected response resolves as `"unreachable"`.
+   * Resolves with the key and the provider's verdict on it. Never rejects: a
+   * network failure or an unexpected response resolves as `"unreachable"`.
    */
-  verify(authId: string, authToken: string): Promise<CredentialVerification>;
+  verify(credentials: SmartyCredentials): Promise<ResolvedSmartyCredentials>;
 }
 
 export interface SpreadsheetReader {

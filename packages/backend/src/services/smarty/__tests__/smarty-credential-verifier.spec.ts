@@ -1,7 +1,10 @@
 import { describe, expect, test, vi } from "vitest";
 
 import { SMARTY_US_STREET_URL } from "../../../config/constants.js";
+import type { SmartyCredentials } from "../../../types/credentials.js";
 import { SmartyCredentialVerifier } from "../smarty-credential-verifier.js";
+
+const key: SmartyCredentials = { authId: "id", authToken: "token" };
 
 /** Answers every request with one status, recording what was asked for. */
 function fetchAnswering(status: number): { fetch: typeof fetch; requests: URL[] } {
@@ -25,20 +28,20 @@ describe("SmartyCredentialVerifier", () => {
     { status: 429, expected: "unreachable" },
     { status: 500, expected: "unreachable" },
     { status: 503, expected: "unreachable" },
-  ])("answers HTTP $status as $expected", async ({ status, expected }) => {
+  ])("answers HTTP $status as $expected, alongside the key it was asked about", async ({ status, expected }) => {
     const { fetch } = fetchAnswering(status);
     const verifier = new SmartyCredentialVerifier(fetch);
 
-    const verdict = await verifier.verify("id", "token");
+    const resolved = await verifier.verify(key);
 
-    expect(verdict).toBe(expected);
+    expect(resolved).toEqual({ credentials: key, verification: expected });
   });
 
   test("sends the key to the US Street endpoint with no address attached", async () => {
     const { fetch, requests } = fetchAnswering(400);
     const verifier = new SmartyCredentialVerifier(fetch);
 
-    await verifier.verify("id", "token");
+    await verifier.verify(key);
 
     expect(requests).toHaveLength(1);
     const [request] = requests;
@@ -48,21 +51,11 @@ describe("SmartyCredentialVerifier", () => {
     expect([...request.searchParams.keys()].sort()).toEqual(["auth-id", "auth-token"]);
   });
 
-  test("trims the key before sending it", async () => {
-    const { fetch, requests } = fetchAnswering(400);
-    const verifier = new SmartyCredentialVerifier(fetch);
-
-    await verifier.verify("  id  ", "\ttoken\n");
-
-    expect(requests[0].searchParams.get("auth-id")).toBe("id");
-    expect(requests[0].searchParams.get("auth-token")).toBe("token");
-  });
-
   test("encodes characters that would otherwise break the query string", async () => {
     const { fetch, requests } = fetchAnswering(400);
     const verifier = new SmartyCredentialVerifier(fetch);
 
-    await verifier.verify("id", "a&b=c+d");
+    await verifier.verify({ authId: "id", authToken: "a&b=c+d" });
 
     expect(requests[0].searchParams.get("auth-token")).toBe("a&b=c+d");
     expect(requests[0].search).toContain("auth-token=a%26b%3Dc%2Bd");
@@ -79,9 +72,9 @@ describe("SmartyCredentialVerifier", () => {
     const answering = vi.fn(async () => new Response(erroringBody, { status: 400 })) as unknown as typeof fetch;
     const verifier = new SmartyCredentialVerifier(answering);
 
-    const verdict = await verifier.verify("id", "token");
+    const resolved = await verifier.verify(key);
 
-    expect(verdict).toBe("validated");
+    expect(resolved.verification).toBe("validated");
   });
 
   test("answers unreachable when the request cannot be made", async () => {
@@ -90,9 +83,9 @@ describe("SmartyCredentialVerifier", () => {
     }) as unknown as typeof fetch;
     const verifier = new SmartyCredentialVerifier(failing);
 
-    const verdict = await verifier.verify("id", "token");
+    const resolved = await verifier.verify(key);
 
-    expect(verdict).toBe("unreachable");
+    expect(resolved.verification).toBe("unreachable");
   });
 
   test("gives up and answers unreachable when Smarty does not answer in time", async () => {
@@ -104,8 +97,8 @@ describe("SmartyCredentialVerifier", () => {
     ) as unknown as typeof fetch;
     const verifier = new SmartyCredentialVerifier(hanging, 5);
 
-    const verdict = await verifier.verify("id", "token");
+    const resolved = await verifier.verify(key);
 
-    expect(verdict).toBe("unreachable");
+    expect(resolved.verification).toBe("unreachable");
   });
 });

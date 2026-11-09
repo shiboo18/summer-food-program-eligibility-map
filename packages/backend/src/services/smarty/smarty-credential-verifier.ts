@@ -1,6 +1,10 @@
 import { SMARTY_US_STREET_URL, SMARTY_VERIFY_TIMEOUT_MS } from "../../config/constants.js";
 import type { CredentialVerifier } from "../../contracts.js";
-import type { CredentialVerification } from "../../types/credentials.js";
+import type {
+  CredentialVerification,
+  ResolvedSmartyCredentials,
+  SmartyCredentials,
+} from "../../types/credentials.js";
 
 /**
  * Smarty authenticates a request before it reads the payload, so a request with
@@ -24,10 +28,14 @@ export class SmartyCredentialVerifier implements CredentialVerifier {
     private readonly timeoutMs: number = SMARTY_VERIFY_TIMEOUT_MS,
   ) {}
 
-  public async verify(authId: string, authToken: string): Promise<CredentialVerification> {
+  public async verify(credentials: SmartyCredentials): Promise<ResolvedSmartyCredentials> {
+    return { credentials, verification: await this.ask(credentials) };
+  }
+
+  private async ask({ authId, authToken }: SmartyCredentials): Promise<CredentialVerification> {
     const url = new URL(SMARTY_US_STREET_URL);
-    url.searchParams.set("auth-id", authId.trim());
-    url.searchParams.set("auth-token", authToken.trim());
+    url.searchParams.set("auth-id", authId);
+    url.searchParams.set("auth-token", authToken);
 
     let response: Response;
     try {

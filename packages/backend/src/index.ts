@@ -7,6 +7,7 @@ export * from "./types/index.js";
 /* Adapters, grouped by the system they talk to. */
 export {
   SettingsStore,
+  parseCredentialInput,
   type CredentialInput,
   type CredentialStatus,
 } from "./services/local/settings-store.js";
@@ -20,7 +21,11 @@ export { EsriGeocoder } from "./services/geocoder/esri-geocoder.js";
 export { KyHttpClient } from "./services/http/ky-http-client.js";
 
 export { PreferencesService } from "./core/preferences-service.js";
-export { checkStoredCredentials } from "./core/smarty-credentials.js";
+export {
+  checkStoredCredentials,
+  saveAcceptedCredentials,
+  toSmartyCredentials,
+} from "./core/smarty-credentials.js";
 export { SpreadsheetValidationService } from "./core/spreadsheet-validation-service.js";
 export { locateRows, type LocateRowsResult, type UnlocatedRow } from "./core/run/locate-rows.js";
 export {

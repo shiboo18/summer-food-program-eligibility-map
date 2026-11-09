@@ -22,6 +22,12 @@ interface SpreadsheetSelection {
   readonly rowCount: number;
 }
 
+interface CredentialSaveResult {
+  readonly saved: boolean;
+  readonly check: CredentialCheck;
+  readonly status: CredentialStatus;
+}
+
 interface ExportResult {
   readonly canceled: boolean;
   readonly filePath?: string;
@@ -66,7 +72,7 @@ contextBridge.exposeInMainWorld(
     settings: Object.freeze({
       getStatus: () => ipcRenderer.invoke("settings:get-status") as Promise<CredentialStatus>,
       save: (input: CredentialInput) =>
-        ipcRenderer.invoke("settings:save", input) as Promise<CredentialStatus>,
+        ipcRenderer.invoke("settings:save", input) as Promise<CredentialSaveResult>,
       clear: () => ipcRenderer.invoke("settings:clear") as Promise<CredentialStatus>,
       verify: () => ipcRenderer.invoke("settings:verify") as Promise<CredentialCheck>,
     }),

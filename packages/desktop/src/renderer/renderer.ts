@@ -1,6 +1,5 @@
 import type {
   ColumnMapping,
-  CredentialStatus,
   EligibilityReport,
   Preferences,
   RunPhase,
@@ -563,16 +562,9 @@ async function performChecks(): Promise<void> {
     return;
   }
 
-  let credentialStatus: CredentialStatus;
-  try {
-    credentialStatus = await bridge.settings.getStatus();
-  } catch (error: unknown) {
-    checksMessage.textContent = friendlyMessage(error, "Unable to read credential status.");
-    checksMessage.dataset.state = "error";
-    return;
-  }
-  if (!credentialStatus.smartyAuthId || !credentialStatus.smartyAuthToken) {
-    window.alert("Set Smarty AUTH_ID and AUTH_TOKEN in Settings before running checks.");
+  const { blocker } = settingsPanel.credentialView();
+  if (blocker !== undefined) {
+    window.alert(blocker);
     showSettings(true);
     settingsPanel.openCredentials();
     return;
@@ -751,6 +743,8 @@ function reportStartupError(error: unknown): void {
   window.alert(friendlyMessage(error, "Unable to start vibeCheck."));
 }
 
+const homeCredentialNotice = getRequiredElement<HTMLElement>("#home-credential-notice");
+
 const settingsPanel = createSettingsPanel({
   getPreferences: () => preferences,
   updatePreferences,
@@ -763,6 +757,10 @@ const settingsPanel = createSettingsPanel({
     if (selectedSpreadsheet !== null) {
       renderMapping(selectedSpreadsheet);
     }
+  },
+  onCredentialStateChange: ({ homeNotice }): void => {
+    homeCredentialNotice.textContent = homeNotice ?? "";
+    homeCredentialNotice.hidden = homeNotice === undefined;
   },
 });
 
@@ -825,22 +823,15 @@ getRequiredElement<HTMLButtonElement>("#home-link").addEventListener("click", ()
 });
 
 getRequiredElement<HTMLButtonElement>("#home-start").addEventListener("click", (): void => {
-  /* Smarty credentials are required before any run, so send a partner who has not
-     set them straight to the credentials screen rather than into an upload that
-     would only fail. */
-  void bridge.settings
-    .getStatus()
-    .then((status): void => {
-      settingsPanel.showCredentialStatus(status);
-      if (!status.smartyAuthId || !status.smartyAuthToken) {
-        showSettings(true);
-        settingsPanel.openCredentials();
-        return;
-      }
-      showView("workflow");
-      uploadExcelButton.focus();
-    })
-    .catch(reportStartupError);
+  /* A run needs a key Smarty accepts, so send a partner without one straight to
+     the credentials screen rather than into an upload that would only fail. */
+  if (settingsPanel.credentialView().blocker !== undefined) {
+    showSettings(true);
+    settingsPanel.openCredentials();
+    return;
+  }
+  showView("workflow");
+  uploadExcelButton.focus();
 });
 
 getRequiredElement<HTMLAnchorElement>("#home-settings-link").addEventListener("click", (event): void => {
@@ -862,7 +853,7 @@ async function initialize(): Promise<void> {
     bridge.preferences.get(),
     bridge.preferences.getSystemTheme(),
   ]);
-  settingsPanel.showCredentialStatus(status);
+  settingsPanel.showStoredCredentials(status);
   preferences = storedPreferences;
   systemTheme = resolvedSystemTheme;
   applyAppearance();
@@ -871,6 +862,8 @@ async function initialize(): Promise<void> {
   renderHomeSteps();
   applyCheckDefaults(preferences.checkSelection);
   showView("home");
+  /* Not awaited: the home page is usable while Smarty answers. */
+  void settingsPanel.checkCredentials();
 }
 
 void initialize().catch(reportStartupError);

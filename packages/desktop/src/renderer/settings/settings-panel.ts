@@ -1,6 +1,7 @@
 import type {
   AppAccessibilitySettings,
   CachedCheckSelection,
+  CredentialCheck,
   CredentialInput,
   CredentialStatus,
   Preferences,
@@ -9,8 +10,15 @@ import type {
    dependencies into the browser context. */
 import { addressFields, type AddressField } from "../../../../backend/dist/core/address-fields.js";
 import { followingCells, parseTypedCells } from "../../../../backend/dist/core/cell-mapping.js";
+import { INCOMPLETE_KEY_MESSAGE, toSmartyCredentials } from "../../../../backend/dist/core/smarty-credentials.js";
 import { getRequiredElement } from "../dom.js";
+import { latestOnly } from "../workflow/latest-only.js";
 import { credentialFields, type SmartyCredential } from "./credential-fields.js";
+import {
+  credentialStatusView,
+  type CredentialDisplayState,
+  type CredentialStatusView,
+} from "./credential-status-text.js";
 import { createDialog } from "./dialog.js";
 
 export interface SettingsPanelPorts {
@@ -22,13 +30,23 @@ export interface SettingsPanelPorts {
   applyCheckDefaults(selection: CachedCheckSelection): void;
   /** Mirrors newly saved header cells onto the Map columns step so both agree. */
   applyColumnDefaults(): void;
+  /** Called whenever the stored key's state changes, so other screens can reflect it. */
+  onCredentialStateChange(view: CredentialStatusView): void;
 }
 
 export interface SettingsPanel {
   /** Re-renders every control from the current preferences. */
   refresh(): void;
   openCredentials(): void;
-  showCredentialStatus(status: CredentialStatus): void;
+  /**
+   * Shows which halves of the key are stored. Half a key or none reads as not
+   * set straight away; a whole key reads as checking until `checkCredentials`.
+   */
+  showStoredCredentials(status: CredentialStatus): void;
+  /** Asks Smarty about the stored key in the background; never rejects. */
+  checkCredentials(): Promise<void>;
+  /** The stored key's state as last shown. */
+  credentialView(): CredentialStatusView;
 }
 
 /** Long enough for any column letters plus a row, short enough to reject prose. */
@@ -41,24 +59,22 @@ const cellLabels = new Map<AddressField, string>(
 export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   const bridge = window.shareOurStrengths;
 
-  /* Smarty credentials. Secrets live in a modal; Settings shows only a mark. */
+  /* Smarty credentials. Secrets live in a modal; Settings shows only Smarty's
+     verdict on them, in the group and again inside the modal. */
   const credentialFieldsContainer = getRequiredElement<HTMLElement>("#credential-fields");
-  const credentialStatusMark = getRequiredElement<HTMLElement>("#credential-status");
+  const credentialStatusLines = [
+    getRequiredElement<HTMLElement>("#credential-status"),
+    getRequiredElement<HTMLElement>("#credential-dialog-status"),
+  ];
   const openCredentialsButton = getRequiredElement<HTMLButtonElement>("#open-credentials");
   const settingsForm = getRequiredElement<HTMLFormElement>("#settings-form");
   const settingsMessage = getRequiredElement<HTMLElement>("#settings-message");
   const credentialInputs = new Map<SmartyCredential, HTMLInputElement>();
-  const credentialStatusElements = new Map<SmartyCredential, HTMLElement>();
 
   for (const { name, label } of credentialFields) {
     const caption = document.createElement("label");
-    caption.className = "credential-label";
     caption.htmlFor = `credential-${name}`;
-    const text = document.createElement("span");
-    text.textContent = label;
-    const status = document.createElement("strong");
-    status.textContent = "Not configured";
-    caption.append(text, status);
+    caption.textContent = label;
 
     const input = document.createElement("input");
     input.id = `credential-${name}`;
@@ -69,7 +85,6 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
 
     credentialFieldsContainer.append(caption, input);
     credentialInputs.set(name, input);
-    credentialStatusElements.set(name, status);
   }
 
   const credentialDialog = createDialog("#credential-overlay", openCredentialsButton, {
@@ -98,53 +113,75 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     window.alert(errorMessage(error));
   }
 
-  function showCredentialStatus(status: CredentialStatus): void {
+  let credentialState: CredentialDisplayState = "checking";
+
+  function showCredentialState(state: CredentialDisplayState): void {
+    credentialState = state;
+    const view = credentialStatusView(state);
+    for (const line of credentialStatusLines) {
+      line.textContent = view.text;
+      line.dataset.tone = view.tone;
+      /* Hidden rather than left empty, so it leaves no gap in the dialog. */
+      line.hidden = view.text === "";
+    }
+    ports.onCredentialStateChange(view);
+  }
+
+  function showStoredCredentials(status: CredentialStatus): void {
+    /* Stored secrets are never read back, so a placeholder stands in for them. */
     for (const { name } of credentialFields) {
-      const configured = status[name];
-      const element = credentialStatusElements.get(name);
-      if (element !== undefined) {
-        element.textContent = configured ? "Configured" : "Not configured";
-        element.dataset.configured = String(configured);
-      }
-      /* Stored secrets are never read back, so a placeholder stands in for them. */
       const input = credentialInputs.get(name);
       if (input !== undefined) {
-        input.placeholder = configured ? "xxxxx" : "";
+        input.placeholder = status[name] ? "xxxxx" : "";
       }
     }
+    const wholeKey = credentialFields.every(({ name }) => status[name]);
+    openCredentialsButton.textContent = wholeKey ? "Update Smarty credentials" : "Set Smarty credentials";
+    showCredentialState(wholeKey ? "checking" : "not-set");
+  }
 
-    const missing = credentialFields.filter(({ name }) => !status[name]);
-    const configured = missing.length === 0;
-    if (configured) {
-      /* A bare glyph means nothing to a screen reader, so it carries a label. */
-      credentialStatusMark.textContent = "\u2713";
-      credentialStatusMark.setAttribute("aria-label", "AUTH_ID and AUTH_TOKEN are configured");
-    } else {
-      credentialStatusMark.textContent =
-        missing.length < credentialFields.length
-          ? `${missing.map(({ label }) => label).join(" and ")} missing`
-          : "";
-      credentialStatusMark.removeAttribute("aria-label");
+  /* Every answer about the key goes through here, so a slower answer about a key
+     the partner has since replaced or cleared never overwrites the newer one. A
+     save or a clear already knows its answer, so it passes it in. */
+  const showLatestCheck = latestOnly(
+    async (known?: CredentialCheck): Promise<CredentialCheck> => known ?? bridge.settings.verify(),
+    showCredentialState,
+  );
+
+  async function checkCredentials(): Promise<void> {
+    if (credentialState !== "not-set") {
+      showCredentialState("checking");
     }
-    credentialStatusMark.dataset.configured = String(configured);
-    openCredentialsButton.textContent = configured
-      ? "Update Smarty credentials"
-      : "Set Smarty credentials";
+    /* The bridge itself failing says nothing about the key either way. */
+    await showLatestCheck().catch((): void => showCredentialState("unreachable"));
   }
 
   settingsForm.addEventListener("submit", (event): void => {
     event.preventDefault();
-    /* A blank field keeps whatever is already stored, so only send what was typed. */
-    const input: CredentialInput = Object.fromEntries(
-      credentialFields
-        .map(({ name }): readonly [SmartyCredential, string] => [name, credentialInputs.get(name)?.value ?? ""])
-        .filter(([, value]) => value.length > 0),
+    /* A save replaces the whole key, so both halves are needed every time. */
+    const credentials = toSmartyCredentials(
+      credentialInputs.get("smartyAuthId")?.value,
+      credentialInputs.get("smartyAuthToken")?.value,
     );
+    if (credentials === undefined) {
+      settingsMessage.textContent = INCOMPLETE_KEY_MESSAGE;
+      settingsMessage.dataset.state = "error";
+      return;
+    }
+    const input: CredentialInput = { smartyAuthId: credentials.authId, smartyAuthToken: credentials.authToken };
     void bridge.settings
       .save(input)
-      .then((status): void => {
+      .then(({ saved, check, status }): void => {
+        if (!saved) {
+          /* Nothing was stored, so the status still describes the key that is.
+             The typed values stay in the form so a typo can be fixed. */
+          settingsMessage.textContent = credentialStatusView(check).refusedSave ?? "That key wasn't saved.";
+          settingsMessage.dataset.state = "error";
+          return;
+        }
         settingsForm.reset();
-        showCredentialStatus(status);
+        showStoredCredentials(status);
+        void showLatestCheck(check);
         settingsMessage.textContent = "Credentials saved with operating-system encryption.";
         settingsMessage.dataset.state = "success";
       })
@@ -158,7 +195,8 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     void bridge.settings
       .clear()
       .then((status): void => {
-        showCredentialStatus(status);
+        showStoredCredentials(status);
+        void showLatestCheck("not-set");
         settingsMessage.textContent = "Stored credentials cleared.";
         settingsMessage.dataset.state = "success";
       })
@@ -337,6 +375,8 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     openCredentials(): void {
       credentialDialog.open();
     },
-    showCredentialStatus,
+    showStoredCredentials,
+    checkCredentials,
+    credentialView: (): CredentialStatusView => credentialStatusView(credentialState),
   };
 }

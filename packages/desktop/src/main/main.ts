@@ -19,6 +19,9 @@ import {
   createPassReporters,
   locateRows,
   parseColumnMapping,
+  parseCredentialInput,
+  saveAcceptedCredentials,
+  toSmartyCredentials,
   toResultAnnotation,
   type AddressRowsResult,
   type AreaEligibilityResult,
@@ -72,15 +75,13 @@ function createPreferencesService(): PreferencesService {
   return new PreferencesService(new PreferencesStore(join(app.getPath("userData"), "preferences.v1.json")));
 }
 
-type SmartyCredentialsProvider = () => Promise<SmartyCredentials>;
+/** The stored key, or `undefined` when no whole key is stored. */
+type SmartyCredentialsProvider = () => Promise<SmartyCredentials | undefined>;
 
 function createSmartyCredentialsProvider(settings: SettingsStore): SmartyCredentialsProvider {
   return async () => {
-    const credentials = await settings.getCredentials();
-    return {
-      authId: credentials.smartyAuthId,
-      authToken: credentials.smartyAuthToken,
-    };
+    const stored = await settings.getCredentials();
+    return toSmartyCredentials(stored.smartyAuthId, stored.smartyAuthToken);
   };
 }
 
@@ -378,7 +379,14 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
   });
   ipcMain.handle("settings:save", async (event, input: unknown): Promise<unknown> => {
     assertTrustedSender(event);
-    return settings.save(input);
+    const typed = parseCredentialInput(input);
+    const outcome = await saveAcceptedCredentials(toSmartyCredentials(typed.smartyAuthId, typed.smartyAuthToken), {
+      store: async ({ authId, authToken }): Promise<void> => {
+        await settings.save({ smartyAuthId: authId, smartyAuthToken: authToken });
+      },
+      verifier: credentialVerifier,
+    });
+    return { ...outcome, status: await settings.getStatus() };
   });
   ipcMain.handle("settings:clear", async (event): Promise<unknown> => {
     assertTrustedSender(event);

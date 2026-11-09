@@ -20,6 +20,15 @@ export interface SpreadsheetSelection {
   readonly rowCount: number;
 }
 
+/** What saving credentials did. A key Smarty refuses is not stored, so `status` is unchanged. */
+export interface CredentialSaveResult {
+  readonly saved: boolean;
+  /** Smarty's answer about the key the save would leave stored. */
+  readonly check: CredentialCheck;
+  /** Which halves are stored after the save. */
+  readonly status: CredentialStatus;
+}
+
 export interface ExportResult {
   readonly canceled: boolean;
   readonly filePath?: string;
@@ -50,7 +59,8 @@ declare global {
       };
       readonly settings: {
         getStatus(): Promise<CredentialStatus>;
-        save(input: CredentialInput): Promise<CredentialStatus>;
+        /** Stores the typed halves unless Smarty refuses the key they would leave stored. */
+        save(input: CredentialInput): Promise<CredentialSaveResult>;
         clear(): Promise<CredentialStatus>;
         /** Asks Smarty about the stored key. Resolves `"not-set"` without asking when half or all of it is missing. */
         verify(): Promise<CredentialCheck>;
