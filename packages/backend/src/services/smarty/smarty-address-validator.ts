@@ -1,7 +1,9 @@
 import SmartySDK from "smartystreets-javascript-sdk";
 
 import type { AddressValidator } from "../../contracts.js";
+import { resolveCredentials, type ResolvedCredentials } from "../../core/smarty-credentials.js";
 import type { Address, AddressVerificationResult } from "../../types/address.js";
+import type { SmartyCredentials } from "../../types/credentials.js";
 import type { LocationPrecision } from "../../types/eligibility.js";
 import type { ProgressReporter } from "../../types/progress.js";
 
@@ -13,11 +15,6 @@ const maximumBatchSize = 100;
 
 interface SmartyClient {
   send(batch: SmartyBatch): Promise<void>;
-}
-
-interface SmartyCredentials {
-  readonly authId: string | undefined;
-  readonly authToken: string | undefined;
 }
 
 type SmartyCredentialProvider = () => Promise<SmartyCredentials>;
@@ -62,14 +59,12 @@ export class SmartyAddressValidator implements AddressValidator {
   }
 
   /** The stored credentials, trimmed and confirmed usable before any request is built. */
-  private async getAndResolveCredentials(): Promise<{ readonly authId: string; readonly authToken: string }> {
-    const stored = await this.getCredentials();
-    const authId = stored.authId?.trim() ?? "";
-    const authToken = stored.authToken?.trim() ?? "";
-    if (!authId || !authToken) {
+  private async getAndResolveCredentials(): Promise<ResolvedCredentials> {
+    const credentials = resolveCredentials(await this.getCredentials());
+    if (credentials === undefined) {
       throw new Error("Configure Smarty AUTH_ID and AUTH_TOKEN in Settings before verifying.");
     }
-    return { authId, authToken };
+    return credentials;
   }
 
   private async validateChunk(

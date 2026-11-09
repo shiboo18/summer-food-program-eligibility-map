@@ -5,6 +5,7 @@
  */
 
 import type { Address, AddressVerificationResult } from "./types/address.js";
+import type { CredentialVerification } from "./types/credentials.js";
 import type {
   AreaEligibilityResult,
   CheckOutcome,
@@ -32,6 +33,18 @@ export interface AddressValidator {
     addresses: readonly Address[],
     onProgress?: ProgressReporter,
   ): Promise<readonly AddressVerificationResult[]>;
+}
+
+/**
+ * Asks the address provider whether a secret key is accepted, without
+ * submitting an address, so a check costs the partner no lookups.
+ */
+export interface CredentialVerifier {
+  /**
+   * Resolves with the provider's answer. Never rejects: a network failure or an
+   * unexpected response resolves as `"unreachable"`.
+   */
+  verify(authId: string, authToken: string): Promise<CredentialVerification>;
 }
 
 export interface SpreadsheetReader {

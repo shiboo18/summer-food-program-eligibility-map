@@ -24,6 +24,15 @@ export const RESULT_COLUMNS = {
   area: "USDA Eligibility",
 } as const;
 
+/** Smarty US Street API endpoint, also used to check a secret key with no address attached. */
+export const SMARTY_US_STREET_URL = "https://us-street.api.smarty.com/street-address";
+
+/**
+ * How long a credential check waits for Smarty, in milliseconds. It runs in the
+ * background on every launch, so a slow network should give up rather than hang.
+ */
+export const SMARTY_VERIFY_TIMEOUT_MS = 8_000;
+
 /** Esri World Geocoder — free/anonymous single-candidate lookup. Returns a match score (0–100). */
 export const ESRI_GEOCODE_SERVICE_URL = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer";
 
