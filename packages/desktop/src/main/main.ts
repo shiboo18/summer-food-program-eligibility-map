@@ -21,7 +21,6 @@ import {
   parseColumnMapping,
   parseCredentialInput,
   saveAcceptedCredentials,
-  toCredentialInput,
   toSmartyCredentials,
   toResultAnnotation,
   type AddressRowsResult,
@@ -379,7 +378,7 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
     assertTrustedSender(event);
     const outcome = await saveAcceptedCredentials(toSmartyCredentials(parseCredentialInput(input)), {
       store: async (credentials): Promise<void> => {
-        await settings.save(toCredentialInput(credentials));
+        await settings.save(credentials);
       },
       verifier: credentialVerifier,
     });

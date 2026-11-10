@@ -7,6 +7,8 @@ export interface Dialog {
    * on a screen the user is no longer looking at.
    */
   open(returnFocusTo?: HTMLElement): void;
+  /** Hides the dialog once its work is done, returning focus to whatever opened it. */
+  close(): void;
 }
 
 export interface DialogOptions {
@@ -107,8 +109,7 @@ export function createDialog(overlayId: string, trigger: HTMLButtonElement, opti
       close();
     }
   });
-  /* Closing is driven by Escape, the backdrop, and the close button, never by a caller. */
   dialogs.push({ overlay, close });
 
-  return { open };
+  return { open, close };
 }

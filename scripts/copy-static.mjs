@@ -14,7 +14,7 @@ await Promise.all([
   mkdir(fontOutput, { recursive: true }),
 ]);
 await Promise.all([
-  ...["index.html", "styles.css"].map((fileName) =>
+  ...["index.html", "theme.css", "styles.css"].map((fileName) =>
     copyFile(resolve(rendererSource, fileName), resolve(rendererOutput, fileName)),
   ),
   ...["vibecheck-icon.svg", "vibecheck-icon.png"].map((fileName) =>

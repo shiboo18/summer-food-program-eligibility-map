@@ -6,8 +6,8 @@ import type {
   SmartyCredentials,
 } from "../types/credentials.js";
 
-/** Shown wherever a save is attempted without a whole key. */
-export const INCOMPLETE_KEY_MESSAGE = "Enter both the Auth ID and the Auth Token.";
+/** Shown when a save reaches the main process without a whole key. */
+const INCOMPLETE_KEY_MESSAGE = "Enter both the Auth ID and the Auth Token.";
 
 /**
  * Builds a whole key from the halves the form sent or the store holds, trimmed;

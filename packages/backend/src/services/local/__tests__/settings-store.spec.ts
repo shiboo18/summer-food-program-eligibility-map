@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, stat } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, test } from "vitest";
@@ -23,7 +23,7 @@ describe("SettingsStore", () => {
     const filePath = join(directory, "settings.json");
     const store = new SettingsStore(filePath, protector);
 
-    const status = await store.save({ smartyAuthId: "auth-id", smartyAuthToken: "top-secret" });
+    const status = await store.save({ authId: "auth-id", authToken: "top-secret" });
 
     expect(status).toEqual({ smartyAuthId: true, smartyAuthToken: true });
     const contents = await readFile(filePath, "utf8");
@@ -35,11 +35,49 @@ describe("SettingsStore", () => {
     });
   });
 
+  test("replaces the whole stored key on every save", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "share-our-strengths-"));
+    directories.push(directory);
+    const store = new SettingsStore(join(directory, "settings.json"), protector);
+    await store.save({ authId: "old-id", authToken: "old-token" });
+
+    await store.save({ authId: "new-id", authToken: "new-token" });
+
+    expect(await store.getCredentials()).toEqual({ smartyAuthId: "new-id", smartyAuthToken: "new-token" });
+  });
+
+  /* A save writes the whole key afresh, so an unreadable file is replaced rather
+     than blocking every save until the partner finds Clear. */
+  test("saves over a credentials file that cannot be read", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "share-our-strengths-"));
+    directories.push(directory);
+    const filePath = join(directory, "settings.json");
+    await writeFile(filePath, "{ not json", "utf8");
+    const store = new SettingsStore(filePath, protector);
+
+    const status = await store.save({ authId: "auth-id", authToken: "top-secret" });
+
+    expect(status).toEqual({ smartyAuthId: true, smartyAuthToken: true });
+    expect(await store.getCredentials()).toEqual({ smartyAuthId: "auth-id", smartyAuthToken: "top-secret" });
+  });
+
+  test("refuses a credential longer than the store supports, writing nothing", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "share-our-strengths-"));
+    directories.push(directory);
+    const filePath = join(directory, "settings.json");
+    const store = new SettingsStore(filePath, protector);
+
+    await expect(store.save({ authId: "auth-id", authToken: "x".repeat(4097) })).rejects.toThrow(
+      "A credential exceeds the supported length.",
+    );
+    await expect(readFile(filePath, "utf8")).rejects.toThrow();
+  });
+
   test("clears all stored credentials", async () => {
     const directory = await mkdtemp(join(tmpdir(), "share-our-strengths-"));
     directories.push(directory);
     const store = new SettingsStore(join(directory, "settings.json"), protector);
-    await store.save({ smartyAuthId: "auth-id" });
+    await store.save({ authId: "auth-id", authToken: "auth-token" });
 
     await expect(store.clear()).resolves.toEqual({ smartyAuthId: false, smartyAuthToken: false });
   });
@@ -48,10 +86,7 @@ describe("SettingsStore", () => {
     const directory = await mkdtemp(join(tmpdir(), "share-our-strengths-"));
     directories.push(directory);
     const filePath = join(directory, "settings.json");
-    await new SettingsStore(filePath, protector).save({
-      smartyAuthId: "auth-id",
-      smartyAuthToken: "top-secret",
-    });
+    await new SettingsStore(filePath, protector).save({ authId: "auth-id", authToken: "top-secret" });
 
     // A changed operating-system key makes existing ciphertext unreadable.
     const rotatedKey: SecretProtector = {
@@ -72,7 +107,7 @@ describe("SettingsStore", () => {
     const directory = join(parent, "vibeCheck");
     const filePath = join(directory, "credentials.v1.json");
 
-    await new SettingsStore(filePath, protector).save({ smartyAuthId: "auth-id" });
+    await new SettingsStore(filePath, protector).save({ authId: "auth-id", authToken: "auth-token" });
 
     const fileMode = (await stat(filePath)).mode & 0o777;
     const directoryMode = (await stat(directory)).mode & 0o777;
@@ -82,6 +117,8 @@ describe("SettingsStore", () => {
 
   test("fails closed when operating-system encryption is unavailable", async () => {
     const store = new SettingsStore("unused", { ...protector, isEncryptionAvailable: () => false });
-    await expect(store.save({ smartyAuthId: "id" })).rejects.toThrow("Secure credential storage is unavailable");
+    await expect(store.save({ authId: "id", authToken: "token" })).rejects.toThrow(
+      "Secure credential storage is unavailable",
+    );
   });
 });

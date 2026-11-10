@@ -8,6 +8,8 @@
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>vibeCheck</title>
+    <!-- The theme's tokens first; styles.css builds every component from them. -->
+    <link rel="stylesheet" href="./theme.css" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -248,7 +250,7 @@
 
           <div class="settings-group">
             <h3>Map Columns</h3>
-            <p class="settings-intro">Pick the columns your files use.</p>
+            <p class="settings-intro">Select the address fields/columns to run the validations.</p>
             <div class="settings-actions">
               <button id="open-columns" class="primary-button is-active" type="button">
                 Set map columns
@@ -312,7 +314,8 @@
           <!-- Between the fields and the buttons, where the eye already is after pressing Save. -->
           <p id="settings-message" class="settings-message" aria-live="polite"></p>
           <div class="settings-actions">
-            <button class="primary-button is-active" type="submit">Save securely</button>
+            <!-- Greyed out until both halves of the key are typed. -->
+            <button id="save-credentials" class="primary-button" type="submit" disabled>Save securely</button>
             <button id="clear-settings" class="secondary-button" type="button">Clear stored credentials</button>
           </div>
         </form>

@@ -4,20 +4,18 @@ import type {
   CredentialCheck,
   CredentialStatus,
   Preferences,
+  SmartyCredentials,
 } from "../../../../backend/dist/index.js";
 /* Leaf imports, so loading this panel cannot pull the backend's Node-only
    dependencies into the browser context. */
 import { addressFields, type AddressField } from "../../../../backend/dist/core/address-fields.js";
 import { followingCells, parseTypedCells } from "../../../../backend/dist/core/cell-mapping.js";
-import {
-  INCOMPLETE_KEY_MESSAGE,
-  toCredentialInput,
-  toSmartyCredentials,
-} from "../../../../backend/dist/core/smarty-credentials.js";
+import { toCredentialInput, toSmartyCredentials } from "../../../../backend/dist/core/smarty-credentials.js";
 import { SMARTY_API_KEYS_URL } from "../../../../backend/dist/config/constants.js";
 import { friendlyMessage } from "../../shared/text.js";
 import { getRequiredElement } from "../dom.js";
 import { latestOnly } from "../workflow/latest-only.js";
+import { singleFlight } from "../workflow/single-flight.js";
 import { credentialFields, type SmartyCredential } from "./credential-fields.js";
 import {
   credentialStatusView,
@@ -75,6 +73,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   const openCredentialsButton = getRequiredElement<HTMLButtonElement>("#open-credentials");
   const settingsForm = getRequiredElement<HTMLFormElement>("#settings-form");
   const settingsMessage = getRequiredElement<HTMLElement>("#settings-message");
+  const saveCredentialsButton = getRequiredElement<HTMLButtonElement>("#save-credentials");
   const credentialInputs = new Map<SmartyCredential, HTMLInputElement>();
   /* Opens in the partner's own browser, where they are already signed in. */
   getRequiredElement<HTMLAnchorElement>("#open-smarty-keys").href = SMARTY_API_KEYS_URL;
@@ -93,6 +92,24 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
 
     credentialFieldsContainer.append(caption, input);
     credentialInputs.set(name, input);
+    input.addEventListener("input", updateSaveAvailability);
+  }
+
+  function typedCredentials(): SmartyCredentials | undefined {
+    return toSmartyCredentials(Object.fromEntries([...credentialInputs].map(([name, input]) => [name, input.value])));
+  }
+
+  /* Save stays greyed out until both halves are typed: a save replaces the whole key. */
+  function updateSaveAvailability(): void {
+    const ready = typedCredentials() !== undefined;
+    saveCredentialsButton.disabled = !ready;
+    saveCredentialsButton.classList.toggle("is-active", ready);
+  }
+
+  /* The form's own reset fires no input events, so availability is redone with it. */
+  function resetCredentialForm(): void {
+    settingsForm.reset();
+    updateSaveAvailability();
   }
 
   const credentialDialog = createDialog("#credential-overlay", openCredentialsButton, {
@@ -100,6 +117,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     onOpen: (): void => {
       settingsMessage.textContent = "";
       settingsMessage.dataset.state = "idle";
+      updateSaveAvailability();
       credentialInputs.get(credentialFields[0]?.name ?? "smartyAuthId")?.focus();
     },
   });
@@ -164,32 +182,40 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
 
   settingsForm.addEventListener("submit", (event): void => {
     event.preventDefault();
-    /* A save replaces the whole key, so both halves are needed every time. */
-    const credentials = toSmartyCredentials(
-      Object.fromEntries([...credentialInputs].map(([name, input]) => [name, input.value])),
-    );
-    if (credentials === undefined) {
-      settingsMessage.textContent = INCOMPLETE_KEY_MESSAGE;
-      settingsMessage.dataset.state = "error";
-      return;
+    /* Save is disabled until both halves are typed, and a disabled default
+       button blocks Enter too, so this only narrows the type. */
+    const credentials = typedCredentials();
+    if (credentials !== undefined) {
+      void saveCredentials(credentials);
     }
-    void bridge.settings
-      .save(toCredentialInput(credentials))
-      .then(({ saved, check, status }): void => {
-        if (!saved) {
-          /* Nothing was stored, so the status still describes the key that is.
-             The typed values stay in the form so a typo can be fixed. */
-          settingsMessage.textContent = credentialStatusView(check).refusedSave ?? "That key wasn't saved.";
-          settingsMessage.dataset.state = "error";
-          return;
-        }
-        settingsForm.reset();
-        showStoredCredentials(status);
-        void showLatestCheck(check);
-        settingsMessage.textContent = "Credentials saved with operating-system encryption.";
-        settingsMessage.dataset.state = "success";
-      })
-      .catch(reportOn(settingsMessage));
+  });
+
+  /* Smarty is asked before anything is stored, which can take seconds. Save is
+     greyed out meanwhile, and a second press is ignored rather than sending a
+     second save and showing a second confirmation. */
+  const saveCredentials = singleFlight(async (credentials: SmartyCredentials): Promise<void> => {
+    saveCredentialsButton.disabled = true;
+    saveCredentialsButton.classList.remove("is-active");
+    try {
+      const { saved, check, status } = await bridge.settings.save(toCredentialInput(credentials));
+      if (!saved) {
+        /* Nothing was stored, so the status still describes the key that is.
+           The typed values stay in the form so a typo can be fixed. */
+        settingsMessage.textContent = credentialStatusView(check).refusedSave ?? "That key wasn't saved.";
+        settingsMessage.dataset.state = "error";
+        return;
+      }
+      resetCredentialForm();
+      showStoredCredentials(status);
+      void showLatestCheck(check);
+      credentialDialog.close();
+      /* The system's own pop-up, matching the confirm before a clear. */
+      window.alert("Credentials saved securely.");
+    } catch (error: unknown) {
+      reportOn(settingsMessage)(error);
+    } finally {
+      updateSaveAvailability();
+    }
   });
 
   getRequiredElement<HTMLButtonElement>("#clear-settings").addEventListener("click", (): void => {
@@ -199,10 +225,11 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     void bridge.settings
       .clear()
       .then((status): void => {
+        resetCredentialForm();
         showStoredCredentials(status);
         void showLatestCheck("not-set");
-        settingsMessage.textContent = "Stored credentials cleared.";
-        settingsMessage.dataset.state = "success";
+        credentialDialog.close();
+        window.alert("Stored credentials cleared.");
       })
       .catch(reportOn(settingsMessage));
   });
