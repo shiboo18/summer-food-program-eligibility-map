@@ -657,20 +657,45 @@ p {
   background: var(--surface-soft);
 }
 
-.form-message,
-.settings-message {
+.form-message {
   min-height: 18px;
   margin: 0;
   font-size: 0.73rem;
 }
 
-.form-message[data-state="error"],
-.settings-message[data-state="error"] {
+.form-message[data-state="error"] {
   color: var(--danger);
 }
 
+/* The result of a save in Settings. Partners missed it as a line of small text
+   under the buttons, so it is a centred banner between the fields and the
+   buttons, and takes no room until there is something to say. */
+.settings-message {
+  margin: var(--dialog-gap, 18px) 0 0;
+  padding: 10px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.settings-message:empty {
+  display: none;
+}
+
 .settings-message[data-state="success"] {
+  border-color: var(--success);
   color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+}
+
+.settings-message[data-state="error"] {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 12%, transparent);
 }
 
 .mapping-section,

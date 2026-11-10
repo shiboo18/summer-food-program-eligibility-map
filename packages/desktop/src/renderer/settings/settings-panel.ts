@@ -15,6 +15,7 @@ import {
   toSmartyCredentials,
 } from "../../../../backend/dist/core/smarty-credentials.js";
 import { SMARTY_API_KEYS_URL } from "../../../../backend/dist/config/constants.js";
+import { friendlyMessage } from "../../shared/text.js";
 import { getRequiredElement } from "../dom.js";
 import { latestOnly } from "../workflow/latest-only.js";
 import { credentialFields, type SmartyCredential } from "./credential-fields.js";
@@ -103,21 +104,19 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     },
   });
 
-  function errorMessage(error: unknown, fallback = "Unable to update settings."): string {
-    return error instanceof Error ? error.message : fallback;
-  }
+  const settingsFailure = "Unable to update settings.";
 
   /** Reports onto the message element of the dialog the failing control lives in. */
-  function reportOn(surface: HTMLElement, fallback?: string): (error: unknown) => void {
+  function reportOn(surface: HTMLElement, fallback = settingsFailure): (error: unknown) => void {
     return (error: unknown): void => {
-      surface.textContent = errorMessage(error, fallback);
+      surface.textContent = friendlyMessage(error, fallback);
       surface.dataset.state = "error";
     };
   }
 
   /** For controls with no message element of their own; a silent failure is worse. */
   function reportError(error: unknown): void {
-    window.alert(errorMessage(error));
+    window.alert(friendlyMessage(error, settingsFailure));
   }
 
   let credentialState: CredentialDisplayState = "checking";

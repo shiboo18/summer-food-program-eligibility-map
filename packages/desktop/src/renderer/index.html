@@ -309,11 +309,12 @@
           </div>
 
           <p class="settings-hint">Enter both the Auth ID and the Auth Token. Saving replaces the stored key.</p>
+          <!-- Between the fields and the buttons, where the eye already is after pressing Save. -->
+          <p id="settings-message" class="settings-message" aria-live="polite"></p>
           <div class="settings-actions">
             <button class="primary-button is-active" type="submit">Save securely</button>
             <button id="clear-settings" class="secondary-button" type="button">Clear stored credentials</button>
           </div>
-          <p id="settings-message" class="settings-message" aria-live="polite"></p>
         </form>
       </div>
     </div>
@@ -337,6 +338,7 @@
           <h4 class="settings-subhead">Address</h4>
           <div id="default-columns" class="cell-grid"></div>
 
+          <p id="column-settings-message" class="settings-message" aria-live="polite"></p>
           <div class="settings-actions">
             <button id="save-column-mapping" class="primary-button is-active" type="submit">
               Save header cells
@@ -345,7 +347,6 @@
               Clear saved cells
             </button>
           </div>
-          <p id="column-settings-message" class="settings-message" aria-live="polite"></p>
         </form>
       </div>
     </div>

@@ -37,7 +37,7 @@ import { singleFlight } from "./workflow/single-flight.js";
 import { workflowSteps } from "./workflow/steps/index.js";
 import type { WorkflowContext } from "./workflow/workflow-step.js";
 import { formatRuntimeSummary } from "../shared/runtime-info.js";
-import { splitAroundFileName } from "../shared/text.js";
+import { friendlyMessage, splitAroundFileName } from "../shared/text.js";
 import type { SpreadsheetSelection } from "./runtime-api.js";
 
 const bridge = window.shareOurStrengths;
@@ -294,16 +294,6 @@ function renderMapping(selection: SpreadsheetSelection): void {
  * ("Error invoking remote method '…': Error: …") peeled off so the partner sees
  * only the plain message the main process meant, never the internal channel name.
  */
-function friendlyMessage(error: unknown, fallback: string): string {
-  if (!(error instanceof Error)) {
-    return fallback;
-  }
-  const message = error.message
-    .replace(/^Error invoking remote method '[^']*':\s*/, "")
-    .replace(/^(?:[A-Za-z]*Error):\s*/, "")
-    .trim();
-  return message.length > 0 ? message : fallback;
-}
 
 async function openSpreadsheet(): Promise<void> {
   setUploadLoading(true);
