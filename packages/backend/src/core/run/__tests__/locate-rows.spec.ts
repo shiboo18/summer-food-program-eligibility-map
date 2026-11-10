@@ -58,7 +58,7 @@ describe("locateRows", () => {
     expect(located[0]?.geocode.matchedAddress).toBe("SEED");
   });
 
-  /* A ZIP centroid can sit in the wrong block group, so the geocoder gets a go. */
+  /* A ZIP centroid can sit in the wrong block group, so the geocoder is asked too. */
   test("falls back for a postal seed and takes the tighter class", async () => {
     const geocoder = geocoderReturning(geocode("rooftop", 97, "GEOCODED"));
     const seeds = seedsFor(1, seed(geocode("postal", 100, "SEED")));
@@ -69,8 +69,6 @@ describe("locateRows", () => {
     expect(located[0]?.geocode).toMatchObject({ precision: "rooftop", matchedAddress: "GEOCODED" });
   });
 
-  /* The whole point of carrying the standardized address: a corrected address is
-     looked up in its corrected form, not as the partner typed it. */
   test("geocodes Smarty's standardized address rather than the row's raw input", async () => {
     const geocoder = geocoderReturning(geocode("rooftop", 97, "GEOCODED"));
     const corrected = address("1 MAIN STREET APT 4");
@@ -145,7 +143,6 @@ describe("locateRows", () => {
     expect(unlocated).toEqual([{ rowNumber: 3 }]);
   });
 
-  /* A geocoder outage must not abandon the sheet: the row is recorded with why. */
   test("records a geocoder failure against its row and still locates the others", async () => {
     const geocoder: Geocoder = {
       geocode: vi.fn(async (candidate: Address) => {

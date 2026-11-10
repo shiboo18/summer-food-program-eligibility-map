@@ -1,10 +1,9 @@
-/* Public surface of the backend. The renderer and preload import types from here
-   only, so names must stay stable even as the layout underneath changes. */
+/* Public surface of the backend. The renderer and preload import only from here,
+   so these names must stay stable. */
 
 export * from "./contracts.js";
 export * from "./types/index.js";
 
-/* Adapters, grouped by the system they talk to. */
 export { SettingsStore, parseCredentialInput } from "./services/local/settings-store.js";
 export { AppPreferenceStore as PreferencesStore } from "./services/local/preferences-store.js";
 export { ExcelSpreadsheetReader } from "./services/local/excel-spreadsheet-reader.js";
@@ -38,8 +37,7 @@ export type {
   CachedCheckSelection,
 } from "./types/preferences.js";
 
-/* Endpoints are exported so the main process, as the composition root, can inject
-   each service's base URL into its own client. */
+/* Exported so the main process can inject each service's base URL into its client. */
 export {
   AREA_ELIGIBILITY_LAYER_URL,
   ESRI_GEOCODE_SERVICE_URL,

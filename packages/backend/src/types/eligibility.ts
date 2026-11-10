@@ -7,14 +7,13 @@ export interface GeoPoint {
 }
 
 /**
- * How precisely a coordinate is placed, which is what decides whether it can be
- * trusted to fall inside the right census block group. Both providers report a
- * class of their own; these are the classes those map onto.
+ * How precisely a coordinate is placed, which decides whether it can be trusted
+ * to fall in the right census block group. Each provider's own classes map onto
+ * these.
  *
- * This is deliberately separate from the match score. A score says how well the
- * text matched, not where the point landed — a bare "Lebanon, VA 24266" scores
- * 100 while returning a ZIP centroid, beating a real rooftop match on the same
- * street.
+ * Deliberately separate from the match score, which says how well the text
+ * matched, not where the point landed: a bare "Lebanon, VA 24266" scores 100
+ * while returning a ZIP centroid.
  */
 export type LocationPrecision = "rooftop" | "street" | "postal" | "locality" | "unknown";
 
@@ -85,12 +84,9 @@ export interface LocatedRow {
 /**
  * The result of checking one row: either the value, or why that row failed.
  *
- * A batch of thousands of rows has to finish, so a single row's failure is
- * returned as a value rather than thrown. Both arms must be handled where the
- * report is built, which the compiler enforces — a failure cannot be forgotten.
- *
- * Single-point calls still throw the domain errors they always did; the batch
- * wrapper is what turns a throw into the `ok: false` arm.
+ * A batch of thousands of rows has to finish, so one row's failure is returned
+ * as a value rather than thrown, and the compiler makes the report handle both
+ * arms. The batch wrapper turns a single-point throw into the `ok: false` arm.
  */
 export type CheckOutcome<Value> =
   | { readonly ok: true; readonly value: Value }

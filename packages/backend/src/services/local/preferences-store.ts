@@ -11,10 +11,7 @@ import {
   type ThemeMode,
 } from "../../types/preferences.js";
 
-/**
- * Header cells such as `A1`. Values that are not cells are dropped, which also
- * clears column names saved by earlier versions that stored names instead.
- */
+/** Header cells such as `A1`. Anything else, including a stored column name, is dropped. */
 const headerCellPattern = /^[A-Za-z]{1,3}[0-9]{1,7}$/;
 
 function isHeaderCell(value: unknown): value is string {
@@ -25,9 +22,9 @@ export class AppPreferenceStore {
   public constructor(private readonly filePath: string) {}
 
   /**
-   * The stored preferences, or the defaults when there is nothing usable to read.
-   * A file left truncated by a crash mid-write counts as nothing usable: these are
-   * remembered answers, so starting over is always better than refusing to start.
+   * Return the stored preferences, or the defaults when nothing usable can be read,
+   * such as a file truncated mid-write. These are remembered answers, so starting
+   * over is better than refusing to start.
    */
   public async get(): Promise<AppPreferences> {
     let contents: string;
@@ -45,8 +42,7 @@ export class AppPreferenceStore {
 
   /**
    * Replace the preferences named in the patch. A grouped preference is replaced
-   * whole rather than merged, so a caller changing one field of a group sends the
-   * rest of that group with it.
+   * whole, not merged, so a caller changing one field sends the rest of its group.
    */
   public async update(patch: unknown): Promise<AppPreferences> {
     const current = await this.get();

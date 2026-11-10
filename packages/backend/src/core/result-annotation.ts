@@ -48,15 +48,14 @@ const ruralLabelsApproximate: Record<RuralDesignation, RuralLabel> = {
 };
 
 /**
- * Builds one row's sponsor-readable result annotation from its Smarty
- * verification and (when the checks ran) its eligibility result.
+ * Build one row's sponsor-readable result annotation from its Smarty
+ * verification and, when the checks ran, its eligibility result.
  *
- * The Location column carries how precisely the row was placed. When that
- * placement is too coarse to trust which block group the point fell in, the
- * rural and area verdicts are hedged with "(approximate location)", so the
- * caveat rides on the verdict itself rather than only in the Location column.
- * Rural/area read "Not Verified" only when the address was not deliverable or
- * the check produced no result.
+ * When the placement is too coarse to trust which block group the point fell
+ * in, the rural and area verdicts carry "(approximate location)", so the caveat
+ * rides on the verdict and not only in the Location column. They read "Not
+ * Verified" only when the address was undeliverable or the check produced no
+ * result.
  */
 export function toResultAnnotation(
   rowNumber: number,

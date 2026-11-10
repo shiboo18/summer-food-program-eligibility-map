@@ -12,7 +12,7 @@
  * it and the field names against the live service before shipping.
  */
 
-/** USDA eligibility dataset edition currently wired in. Drives the field name below. */
+/** USDA eligibility dataset edition. Drives the field name below. */
 export const USDA_DATASET_YEAR = 2026;
 
 /** Header names for the result columns appended to the sponsor's spreadsheet. */
@@ -42,7 +42,6 @@ export const SMARTY_VERIFY_TIMEOUT_MS = 8_000;
 /** Esri World Geocoder — free/anonymous single-candidate lookup. Returns a match score (0–100). */
 export const ESRI_GEOCODE_SERVICE_URL = "https://geocode.arcgis.com/arcgis/rest/services/World/GeocodeServer";
 
-/** Operation path on the geocode service. */
 export const ESRI_FIND_CANDIDATES_PATH = "findAddressCandidates";
 
 /**
@@ -77,14 +76,12 @@ export const AREA_ELIGIBILITY_LAYER_URL =
 
 /**
  * The 3-state eligibility field, derived from the dataset year (2026 ->
- * `FY26_Eligibility`). NOTE: use this, not `ELIGFY26`, which only flags the
- * independently-eligible ("orange") case and misses the averaged-eligible
- * ("blue") case.
+ * `FY26_Eligibility`). Use this, not `ELIGFY26`, which flags only the
+ * independently eligible ("orange") case and misses averaged-eligible ("blue").
  *
- * Verify the field against the layer wired above, not against USDA's catalogued
- * dataset (https://usda-fns.hub.arcgis.com/datasets/USDA-FNS::participants-eligible-for-free-and-reduced-price-fy-26/about).
- * That entry points at a different hosted layer which publishes `ELIGFY26` alone,
- * so reading it as the authority loses the averaged-eligible case.
+ * Verify the field against the layer above, not USDA's catalogued dataset
+ * (https://usda-fns.hub.arcgis.com/datasets/USDA-FNS::participants-eligible-for-free-and-reduced-price-fy-26/about):
+ * that entry is a different hosted layer that publishes `ELIGFY26` alone.
  */
 export const AREA_ELIGIBILITY_FIELD = `FY${String(USDA_DATASET_YEAR % 100).padStart(2, "0")}_Eligibility`;
 
@@ -106,12 +103,11 @@ export const AREA_ELIGIBILITY_VALUES = {
 
 /**
  * Match score (0–100) below which a coordinate is not relied on, whatever its
- * precision class. The class says how tightly the point is placed; this says
- * whether the right address was found at all, since a confidently typed rooftop
- * match against the wrong street is still wrong.
+ * precision class. The class says how tightly the point is placed; the score
+ * says whether the right address was found at all.
  *
  * Not a substitute for the class: a bare "Lebanon, VA 24266" scores 100 and
- * returns a ZIP centroid, so score alone would trust it.
+ * returns a ZIP centroid.
  */
 export const GEOCODE_MINIMUM_MATCH_SCORE = 90;
 

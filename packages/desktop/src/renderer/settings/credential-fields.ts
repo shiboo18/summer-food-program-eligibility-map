@@ -10,9 +10,9 @@ export interface CredentialFieldDescriptor {
 }
 
 /**
- * The credential fields in form order. This one table drives the inputs, their
- * stored-value placeholders, and the values sent to the encrypted store.
- * Values are never read back out, so these are always password inputs.
+ * The credential fields in form order. This table drives the inputs, their
+ * placeholders, and the values sent to the encrypted store. Stored values are
+ * never read back, so these are always password inputs.
  */
 export const credentialFields: readonly CredentialFieldDescriptor[] = [
   { name: "smartyAuthId", label: "AUTH_ID" },

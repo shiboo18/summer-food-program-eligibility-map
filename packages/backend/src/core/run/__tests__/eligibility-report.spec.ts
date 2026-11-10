@@ -139,8 +139,6 @@ describe("buildEligibilityReport", () => {
     expect(result?.area).toEqual(eligible);
   });
 
-  /* A failed check keeps the location the row did resolve, rather than discarding
-     it, and says which check could not be made. */
   test("keeps the location and names the check when an outcome failed", () => {
     const report = buildEligibilityReport(
       input({

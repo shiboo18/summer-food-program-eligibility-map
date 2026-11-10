@@ -117,8 +117,7 @@ describe("SpreadsheetValidationService", () => {
       precision: "postal",
       matchedAddress: "2 CORRECTED ST, AUSTIN, TX 78701-1234",
     });
-    /* Carried so the geocoder can look up the corrected address rather than what
-       the partner typed. */
+    /* So the geocoder looks up the corrected address, not what the partner typed. */
     expect(locations.get(3)?.standardizedAddress).toEqual(correctedAddress);
     expect(locations.has(4)).toBe(false);
   });

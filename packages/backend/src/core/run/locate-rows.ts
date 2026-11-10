@@ -28,12 +28,10 @@ export interface LocateRowsOptions {
 }
 
 /**
- * Resolves a coordinate for every row, so the USDA checks can be handed rows that
- * already carry one.
+ * Resolve a coordinate for every row, so the USDA checks get rows that carry one.
  *
- * A row that cannot be located is separated out rather than dropped, so the report
- * can still account for it. A geocoder failure is likewise recorded against its
- * row instead of abandoning the sheet.
+ * A row that cannot be located, or whose lookup fails, is returned as unlocated
+ * rather than dropped, so the report can account for it and the sheet finishes.
  */
 export async function locateRows(
   rows: readonly AddressRow[],
@@ -75,10 +73,9 @@ export async function locateRows(
 /**
  * Resolve a coordinate for a row.
  *
- * Smarty's coordinate is accepted outright when it is placed tightly enough to
- * decide block-group containment. When it is a ZIP-level centroid, the geocoder
- * is asked as well — given Smarty's *standardized* address, so a corrected
- * address is looked up in its corrected form — and the tighter of the two wins.
+ * A trusted Smarty coordinate is used as is. Otherwise the geocoder is asked as
+ * well, with Smarty's standardized address so a corrected address is looked up
+ * in its corrected form, and the tighter of the two wins.
  */
 async function resolveGeocode(
   row: AddressRow,

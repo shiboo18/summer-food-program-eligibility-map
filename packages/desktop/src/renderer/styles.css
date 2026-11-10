@@ -102,16 +102,27 @@ p {
   line-height: 1.55;
 }
 
+/* Why Get started is greyed out, and the way to fix it. A key that is simply
+   missing reads as a next step; one Smarty refused reads as a problem. */
 .home-notice {
   margin: 0 0 16px;
   padding: 10px 14px;
-  border: 1px solid var(--danger);
-  border-left-width: 3px;
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent-strong);
   border-radius: var(--radius-md);
-  color: var(--danger);
+  color: var(--text);
   font-size: var(--font-size-md);
   font-weight: 600;
   line-height: 1.45;
+}
+
+.home-notice[data-tone="error"] {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.home-notice .text-link {
+  text-decoration: underline;
 }
 
 .text-link {
@@ -149,7 +160,6 @@ p {
   margin-bottom: 10px;
 }
 
-/* The note's body fades in as it opens, rather than appearing all at once. */
 .privacy-note[open] > :not(summary) {
   animation: gentle-fade var(--motion-reveal);
 }
@@ -392,7 +402,6 @@ p {
   color: var(--accent-strong);
 }
 
-/* Unfinished steps stay grayed out until their prerequisites are met. */
 .workflow-step[data-state="upcoming"] .workflow-step-button {
   color: var(--text-faint);
   cursor: not-allowed;
@@ -544,9 +553,8 @@ p {
   margin-top: 4px;
 }
 
-/* The checkbox list has no trailing space of its own, so its buttons would sit
-   against the last check's description. This makes the gap the 20px the mapping
-   grid leaves above its own buttons. */
+/* The checkbox list has no trailing space of its own, so this gives its buttons
+   the same 20px gap the mapping grid leaves above its own. */
 .checks-list {
   margin-bottom: 16px;
 }
@@ -599,9 +607,9 @@ p {
   color: var(--danger);
 }
 
-/* The result of a save in Settings. Partners missed it as a line of small text
-   under the buttons, so it is a centred banner between the fields and the
-   buttons, and takes no room until there is something to say. */
+/* Why a save in Settings did not go through; successes use the notifier's pop-up.
+   A centred banner between the fields and the buttons, so it is hard to miss, that
+   takes no room until there is something to say. */
 .settings-message {
   margin: var(--dialog-gap, 18px) 0 0;
   padding: 10px 14px;
@@ -616,12 +624,6 @@ p {
 
 .settings-message:empty {
   display: none;
-}
-
-.settings-message[data-state="success"] {
-  border-color: var(--success);
-  color: var(--success);
-  background: color-mix(in srgb, var(--success) 12%, transparent);
 }
 
 .settings-message[data-state="error"] {
@@ -726,8 +728,9 @@ p {
 
 .settings-hint {
   margin: 4px 0 12px;
-  color: var(--text-faint);
-  font-size: var(--font-size-2xs);
+  color: var(--text-soft);
+  font-size: var(--font-size-body);
+  line-height: 1.5;
 }
 
 .provider-fields {
@@ -742,24 +745,24 @@ p {
   gap: 7px;
 }
 
-/* Header cell fields sit side by side; each label stays with its own input. */
-/* Header cell fields sit side by side; each label stays with its own input. The
-   subhead above supplies the gap, so the grid adds none of its own. */
+/* One row per field: the label, then an input sized to a cell reference such
+   as F1. Each wrapper steps out of the way so its label and input sit in the
+   grid's two columns and line up down the dialog. */
 .cell-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--dialog-heading-gap, 10px) 16px;
-  margin-top: 0;
+  grid-template-columns: max-content 10ch;
+  gap: 12px 16px;
+  align-items: center;
 }
 
 .cell-field {
-  display: grid;
-  gap: 5px;
+  display: contents;
 }
 
 .cell-field label {
+  margin-top: 0;
   color: var(--text);
-  font-size: var(--font-size-xs);
+  font-size: var(--font-size-body);
   font-weight: 700;
 }
 
@@ -769,21 +772,53 @@ p {
 
 /* The settings dialogs each hold one short form, so they stay narrow.
 
-   One vertical rhythm governs everything inside: `--dialog-gap` between blocks,
-   and the tighter `--dialog-heading-gap` between a heading and what it
-   introduces. Both are declared here so every rule below reads from one place
-   rather than each picking its own margin. */
+   `--dialog-gap` spaces blocks and the tighter `--dialog-heading-gap` follows a
+   heading. Rules below read both from here rather than picking their own margins. */
 .settings-dialog-card {
-  --dialog-gap: 18px;
-  --dialog-heading-gap: 10px;
-  width: min(560px, 100%);
+  --dialog-gap: 20px;
+  --dialog-heading-gap: 8px;
+  width: min(var(--dialog-width, 540px), 100%);
+  padding: 24px;
   gap: 0;
   background: var(--surface);
   box-shadow: var(--shadow-dialog);
 }
 
-.settings-dialog-card h3 {
-  margin-bottom: var(--dialog-heading-gap);
+/* For dialogs holding only a couple of switches. */
+.settings-dialog-card--compact {
+  --dialog-width: 460px;
+}
+
+/* The title and the close button share the first row: the button is lifted out
+   of the flow to the top-right corner, and the title keeps clear of it. */
+.settings-dialog-card > .welcome-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  margin: 0;
+}
+
+.dialog-title {
+  margin: 0 0 var(--dialog-heading-gap);
+  padding-right: 52px;
+  font-size: var(--font-size-dialog-title);
+  line-height: 1.3;
+}
+
+/* Inside a dialog, everything a partner reads or presses is body-sized. */
+.settings-dialog-card .settings-form label,
+.settings-dialog-card .primary-button,
+.settings-dialog-card .secondary-button {
+  font-size: var(--font-size-body);
+}
+
+/* The explanation above already leaves a full gap; the subhead adds none. */
+.dialog-subtext + .settings-subhead {
+  margin-top: 0;
+}
+
+.settings-dialog-card .settings-select {
+  width: min(22ch, 100%);
 }
 
 /* Standing copy under a dialog title, explaining the form without a button to
@@ -791,11 +826,14 @@ p {
 .dialog-subtext {
   margin: 0 0 var(--dialog-gap);
   color: var(--text-soft);
-  font-size: var(--font-size-xs);
-  line-height: 1.6;
+  font-size: var(--font-size-body);
+  line-height: 1.5;
 }
 
+/* Actions sit bottom-right, the main one last, where the eye ends. */
 .settings-dialog-card .settings-actions {
+  justify-content: flex-end;
+  gap: 8px;
   margin-top: var(--dialog-gap);
 }
 
@@ -830,20 +868,13 @@ p {
   margin-bottom: 10px;
 }
 
-.provider-fields-head {
-  display: flex !important;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 /* The way to the key partners need, so it is a button rather than a footnote link. */
 .smarty-keys-button {
   display: inline-flex;
   align-items: center;
-  flex-shrink: 0;
+  justify-self: start;
+  margin-bottom: 4px;
   color: var(--accent-strong);
-  font-size: var(--font-size-base);
   text-decoration: none;
 }
 
@@ -874,7 +905,13 @@ p {
   width: auto;
 }
 
+/* One checkbox row everywhere it appears (the Checks step and Settings): a box
+   sized to the text, a bold title, and a regular-weight description under it.
+   Its look is set here once, never per screen. */
 .settings-toggle input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
   margin-top: 3px;
   accent-color: var(--accent-strong);
 }
@@ -882,17 +919,20 @@ p {
 .settings-toggle strong,
 .settings-toggle small {
   display: block;
+  line-height: 1.5;
 }
 
 .settings-toggle strong {
   color: var(--text);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-body);
+  font-weight: 700;
 }
 
 .settings-toggle small {
   margin-top: 2px;
-  color: var(--text-faint);
-  font-size: var(--font-size-2xs);
+  color: var(--text-soft);
+  font-size: var(--font-size-body);
+  font-weight: 400;
 }
 
 .welcome-overlay {
@@ -906,14 +946,13 @@ p {
   animation: overlay-fade var(--motion-fade);
 }
 
+/* Size, padding and spacing come from .settings-dialog-card, the only cards
+   there are; set here as well, they would win and make every dialog 880px. */
 .welcome-card {
   position: relative;
   display: grid;
-  width: min(880px, 100%);
   max-height: calc(100vh - 48px);
-  padding: clamp(32px, 5vw, 52px);
   overflow-y: auto;
-  gap: 28px;
   border-radius: var(--radius-lg);
 }
 
@@ -1005,7 +1044,7 @@ p {
   }
 }
 
-/* Processing (waiting) screen — mock 05 */
+/* Processing (waiting) screen. */
 .processing-section {
   display: grid;
   place-items: center;
@@ -1174,7 +1213,7 @@ p {
   animation: none;
 }
 
-/* Results summary stat tiles — mock 06 */
+/* Results summary stat tiles. */
 .results-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

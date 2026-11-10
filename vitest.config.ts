@@ -8,11 +8,10 @@ export default defineConfig({
     outputFile: "build/unit-tests/TESTS-TestSuites.xml",
     coverage: {
       /*
-       * The paths where a silent mistake reaches a partner's data: the checks
-       * themselves, what is read from and written to their workbook, what is
-       * persisted, and what the renderer is allowed to do. Presentation is left
-       * out — there is no DOM in this suite, so counting it only produces a number
-       * nobody can act on.
+       * The paths where a silent mistake reaches a partner's data: the checks,
+       * workbook reads and writes, persistence, and what the renderer may do.
+       * Presentation is left out: this suite has no DOM, so its number would not
+       * be actionable.
        */
       include: [
         "packages/backend/src/core/**/*.ts",

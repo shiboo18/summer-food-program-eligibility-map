@@ -1,5 +1,5 @@
 /**
- * Wraps an action so only the most recently started call delivers its result.
+ * Wrap an action so only the most recently started call delivers its result.
  * An earlier call that finishes later is dropped, failure included: an answer
  * about a key the partner has since replaced must not overwrite the current one.
  *

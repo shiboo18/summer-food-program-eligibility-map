@@ -54,10 +54,13 @@
         <h1 id="home-title">Welcome to vibeCheck.</h1>
         <p class="home-copy">
           vibeCheck verifies every address in an Excel workbook against Smarty and ArcGIS, then checks USDA rural and
-          area eligibility. <a id="home-settings-link" class="text-link" href="#" role="button">Open settings</a> to add
-          your Smarty credentials.
+          area eligibility.
         </p>
-        <p id="home-credential-notice" class="home-notice" role="status" hidden></p>
+        <!-- Shown, with a way to fix it, exactly when Get started is held back. -->
+        <p id="home-credential-notice" class="home-notice" data-tone="idle" role="status" hidden>
+          <span id="home-credential-notice-text"></span>
+          <a id="home-credential-notice-link" class="text-link" href="#" role="button">Open settings</a>
+        </p>
 
         <details class="privacy-note">
           <summary class="privacy-note-summary">🔒 Click to see the privacy note</summary>
@@ -76,7 +79,8 @@
         <ol id="home-steps" class="home-steps"></ol>
 
         <div class="form-actions">
-          <button id="home-start" class="primary-button is-active" type="button">Get started</button>
+          <!-- Greyed out until the stored key can run checks. -->
+          <button id="home-start" class="primary-button" type="button" disabled>Get started</button>
         </div>
       </section>
 
@@ -299,14 +303,12 @@
       <div class="welcome-card settings-dialog-card">
         <form id="settings-form" class="settings-form">
           <div class="provider-fields">
-            <div class="provider-fields-head">
-              <h3 id="credential-dialog-title">Secret key</h3>
-              <!-- The address is set from the backend's constants, in one place. -->
-              <a id="open-smarty-keys" class="secondary-button smarty-keys-button" target="_blank" rel="noreferrer"
-                >Open my Smarty keys</a
-              >
-            </div>
-            <p id="credential-dialog-status" class="credential-status" data-tone="pending" aria-live="polite"></p>
+            <h3 id="credential-dialog-title" class="dialog-title">Secret key</h3>
+            <p id="credential-dialog-status" class="credential-status" data-tone="pending" aria-live="off"></p>
+            <!-- href is set from the backend's constants. -->
+            <a id="open-smarty-keys" class="secondary-button smarty-keys-button" target="_blank" rel="noreferrer"
+              >Open my Smarty keys</a
+            >
             <div id="credential-fields" class="credential-fields"></div>
           </div>
 
@@ -314,9 +316,9 @@
           <!-- Between the fields and the buttons, where the eye already is after pressing Save. -->
           <p id="settings-message" class="settings-message" aria-live="polite"></p>
           <div class="settings-actions">
+            <button id="clear-settings" class="secondary-button" type="button">Clear stored credentials</button>
             <!-- Greyed out until both halves of the key are typed. -->
             <button id="save-credentials" class="primary-button" type="submit" disabled>Save securely</button>
-            <button id="clear-settings" class="secondary-button" type="button">Clear stored credentials</button>
           </div>
         </form>
       </div>
@@ -332,7 +334,7 @@
     >
       <div class="welcome-card settings-dialog-card">
         <form id="column-settings-form" class="settings-form">
-          <h3 id="columns-dialog-title">Map Columns</h3>
+          <h3 id="columns-dialog-title" class="dialog-title">Map Columns</h3>
           <p class="dialog-subtext">
             Type the cell that holds each column's header, such as A1. vibeCheck reads whatever header sits at that
             cell, so a saved setup keeps working when column names change between files.
@@ -343,12 +345,8 @@
 
           <p id="column-settings-message" class="settings-message" aria-live="polite"></p>
           <div class="settings-actions">
-            <button id="save-column-mapping" class="primary-button is-active" type="submit">
-              Save header cells
-            </button>
-            <button id="clear-column-mapping" class="secondary-button" type="button">
-              Clear saved cells
-            </button>
+            <button id="clear-column-mapping" class="secondary-button" type="button">Clear saved cells</button>
+            <button id="save-column-mapping" class="primary-button is-active" type="submit">Save header cells</button>
           </div>
         </form>
       </div>
@@ -362,9 +360,9 @@
       aria-labelledby="checks-dialog-title"
       hidden
     >
-      <div class="welcome-card settings-dialog-card">
+      <div class="welcome-card settings-dialog-card settings-dialog-card--compact">
         <div class="settings-form">
-          <h3 id="checks-dialog-title">USDA checks</h3>
+          <h3 id="checks-dialog-title" class="dialog-title">USDA checks</h3>
           <p class="settings-hint">
             These are pre-selected on the Checks step. You can still change them for a single run.
           </p>
@@ -376,6 +374,10 @@
             <input id="pref-area" type="checkbox" />
             <span><strong>Area eligibility</strong><small>Check each address against USDA area eligibility.</small></span>
           </label>
+          <!-- Each change saves as it is made, so this only closes the dialog. -->
+          <div class="settings-actions">
+            <button class="primary-button is-active" type="button" data-dialog-close>Done</button>
+          </div>
         </div>
       </div>
     </div>
@@ -388,9 +390,9 @@
       aria-labelledby="appearance-dialog-title"
       hidden
     >
-      <div class="welcome-card settings-dialog-card">
+      <div class="welcome-card settings-dialog-card settings-dialog-card--compact">
         <div class="settings-form">
-          <h3 id="appearance-dialog-title">Appearance and accessibility</h3>
+          <h3 id="appearance-dialog-title" class="dialog-title">Appearance and accessibility</h3>
           <label for="theme-select">Theme</label>
           <select id="theme-select" class="settings-select">
             <option value="system">Match system</option>
@@ -407,6 +409,9 @@
             <input id="reduce-motion" type="checkbox" />
             <span><strong>Reduce motion</strong><small>Turn off fade transitions between views.</small></span>
           </label>
+          <div class="settings-actions">
+            <button class="primary-button is-active" type="button" data-dialog-close>Done</button>
+          </div>
         </div>
       </div>
     </div>

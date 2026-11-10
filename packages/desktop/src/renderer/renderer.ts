@@ -6,9 +6,8 @@ import type {
   RunProgress,
   ValidationReport,
 } from "../../../backend/dist/index.js";
-/* Leaf imports: these modules hold logic and constants only, so the renderer does
-   not pull the backend's Node-only dependencies into the browser context. Reaching
-   them through the backend's barrel would. */
+/* Leaf imports of logic and constants only: the backend's barrel would pull its
+   Node-only dependencies into the browser context. */
 import { resolveAppearance } from "../../../backend/dist/core/appearance.js";
 import {
   addressFields,
@@ -31,6 +30,7 @@ import {
 } from "../../../backend/dist/core/run-progress.js";
 import { defaultPreferences } from "../../../backend/dist/types/preferences.js";
 import { getRequiredElement } from "./dom.js";
+import { systemNotifier, type Notifier } from "./notifier.js";
 import { createBackgroundQueue } from "./workflow/background-queue.js";
 import { createSettingsPanel } from "./settings/settings-panel.js";
 import { singleFlight } from "./workflow/single-flight.js";
@@ -41,6 +41,7 @@ import { friendlyMessage, splitAroundFileName } from "../shared/text.js";
 import type { SpreadsheetSelection } from "./runtime-api.js";
 
 const bridge = window.shareOurStrengths;
+const notifier: Notifier = systemNotifier;
 
 
 /* Appearance: apply persisted preferences and keep them live. */
@@ -68,10 +69,10 @@ const preferenceSaves = createBackgroundQueue((error: unknown): void => {
 });
 
 /**
- * Saves preferences without holding up the screen the answer was given on.
+ * Save preferences without holding up the screen.
  *
- * @param patch Built when the save's turn comes rather than now, so a group it
- *   carries over from the current preferences is the one the save before it left.
+ * @param patch Built when the save's turn comes rather than now, so any group it
+ *   copies from the current preferences includes the save before it.
  */
 function savePreferences(patch: () => Partial<Preferences>): void {
   preferenceSaves.enqueue((): Promise<void> => updatePreferences(patch()));
@@ -136,10 +137,7 @@ function workflowContext(): WorkflowContext {
   };
 }
 
-/**
- * Writes a step's sub-text, turning any mention of the loaded workbook into a
- * control that reveals it. Every step that names the file is covered from here.
- */
+/** Write a step's sub-text, turning any mention of the loaded workbook into a control that reveals it. */
 function renderIntroCopy(description: string, fileName: string | null): void {
   const mention = fileName === null ? null : splitAroundFileName(description, fileName);
   if (fileName === null || mention === null) {
@@ -156,14 +154,14 @@ function renderIntroCopy(description: string, fileName: string | null): void {
   link.addEventListener("click", (event): void => {
     event.preventDefault();
     void bridge.spreadsheet.reveal(fileName).catch((error: unknown): void => {
-      window.alert(friendlyMessage(error, "That file could not be shown."));
+      notifier.failure(friendlyMessage(error, "That file could not be shown."));
     });
   });
 
   introCopy.replaceChildren(mention.before, link, mention.after);
 }
 
-/** Renders the left step list plus the header and page for the active step. */
+/** Render the step list, header, and page for the active step. */
 function renderWorkflow(): void {
   const context = workflowContext();
   const activeIndex = Math.max(
@@ -218,8 +216,8 @@ function goToStage(next: Stage): void {
   if (step === undefined || !step.isAvailable(workflowContext())) {
     return;
   }
-  /* Built from the saved cells each time the screen is shown, not once per file, so
-     it reflects cells edited in the dialog and a file loaded since. */
+  /* Rebuilt from the saved cells each time the screen is shown, so it reflects
+     cells edited in the dialog and a file loaded since. */
   if (next === "map-columns" && selectedSpreadsheet !== null) {
     renderMapping(selectedSpreadsheet);
   }
@@ -236,8 +234,8 @@ function wait(milliseconds: number): Promise<void> {
 type FileStatusState = "idle" | "checking" | "valid" | "error";
 
 /**
- * Writes the workbook status line. The spinner turns for as long as the file is
- * being checked, so the wait reads as work rather than as a finished verdict.
+ * Write the workbook status line. The spinner turns while the file is being
+ * checked, so the wait reads as work rather than a finished verdict.
  */
 function setFileStatus(message: string, state: FileStatusState): void {
   excelFileMessage.textContent = message;
@@ -276,11 +274,7 @@ function fillMappingSelect(
   select.value = suggestion;
 }
 
-/**
- * Fills the selects from the saved cells, guessing only where nothing is saved.
- * Runs on every entry to the screen rather than once per file, so cells edited in
- * Settings are what it offers.
- */
+/** Fill the selects from the saved cells, guessing only where nothing is saved. */
 function renderMapping(selection: SpreadsheetSelection): void {
   const headers = selection.headers;
   for (const { field, optional, candidates } of addressFields) {
@@ -288,12 +282,6 @@ function renderMapping(selection: SpreadsheetSelection): void {
     fillMappingSelect(mappingSelects[field], headers, optional, preferred);
   }
 }
-
-/**
- * The message to show for a failed call, with Electron's IPC wrapper
- * ("Error invoking remote method '…': Error: …") peeled off so the partner sees
- * only the plain message the main process meant, never the internal channel name.
- */
 
 async function openSpreadsheet(): Promise<void> {
   setUploadLoading(true);
@@ -318,7 +306,7 @@ async function openSpreadsheet(): Promise<void> {
     lastReport = null;
     goToStage("upload");
     setFileStatus("", "idle");
-    window.alert(friendlyMessage(error, "That file could not be opened. Try a different Excel file."));
+    notifier.failure(friendlyMessage(error, "That file could not be opened. Try a different Excel file."));
   } finally {
     setUploadLoading(false);
   }
@@ -341,11 +329,9 @@ function currentMapping(): ColumnMapping {
 }
 
 /**
- * Moves on from the mapping screen, saving the chosen columns behind it.
- *
- * The cells are read from the selects now and written in the background, so the
- * next screen opens without waiting on the store. Nothing later reads the saved
- * cells — the run takes its mapping from the selects.
+ * Move on from the mapping screen, saving the chosen columns in the background so
+ * the next screen opens without waiting on the store. The run takes its mapping
+ * from the selects, not the saved cells.
  */
 function finishMapColumns(): void {
   if (selectedSpreadsheet === null) {
@@ -368,11 +354,9 @@ mappingForm.addEventListener("submit", (event): void => {
 });
 
 /*
- * Choosing a column offers the columns after it for the rest of the address, the
- * way typing a group's first header cell does in Settings. These selects differ
- * from those inputs in already holding a guess, so leaving a filled one alone — as
- * the dialog does — would make this do nothing. Setting the second line to "not
- * used" closes the gap it leaves, so the city moves up beside the street.
+ * Choosing a column offers the columns after it for the rest of the address.
+ * Unlike the Settings cell inputs, these selects always hold a guess, so filled
+ * ones are overwritten too; otherwise this would never do anything.
  */
 for (const { field } of addressFields) {
   mappingSelects[field].addEventListener("change", (): void => {
@@ -391,7 +375,7 @@ for (const { field } of addressFields) {
   });
 }
 
-/* USDA eligibility checks (Module 3). */
+/* USDA eligibility checks. */
 function currentCheckSelection(): EligibilityCheckSelection {
   return {
     addressValidation: checkInputs.addressValidation.checked,
@@ -400,7 +384,7 @@ function currentCheckSelection(): EligibilityCheckSelection {
   };
 }
 
-/** Keeps the USDA checkboxes and the run button in step with the selection rule. */
+/** Keep the USDA checkboxes and the run button in step with the selection rule. */
 function syncCheckControls(): void {
   const selection = currentCheckSelection();
   const controls = resolveCheckControls(selection);
@@ -423,7 +407,7 @@ for (const input of [checkInputs.addressValidation, checkInputs.rural, checkInpu
   input.addEventListener("change", syncCheckControls);
 }
 
-/** Pre-selects the optional checks, then normalizes anything the dependency rule disallows. */
+/** Pre-select the optional checks, then normalize anything the dependency rule disallows. */
 function applyCheckDefaults(selection: Preferences["checkSelection"]): void {
   checkInputs.rural.checked = selection.rural;
   checkInputs.area.checked = selection.area;
@@ -438,9 +422,9 @@ function setRunChecksLoading(loading: boolean): void {
 }
 
 /**
- * Freezes navigation while a run is in flight, so the header and the step rail
- * cannot leave the run or reconfigure it mid-flight. The processing card stays
- * live so its progress keeps announcing.
+ * Freeze the header and the step rail while a run is in flight, so the run cannot
+ * be left or reconfigured. The processing card stays live so its progress keeps
+ * announcing.
  */
 function setUiFrozen(frozen: boolean): void {
   appHeader.toggleAttribute("inert", frozen);
@@ -482,7 +466,7 @@ function renderResultsStats(stats: readonly ResultStat[]): void {
   }
 }
 
-/** Fills the stepper, marking the phase now running and the ones done or still to come. */
+/** Fill the stepper, marking each phase done, running, or still to come. */
 function renderRunSteps(current: RunPhase): void {
   runSteps.replaceChildren(
     ...runPhaseSteps(activeRunPhaseList, current).map((step): HTMLLIElement => {
@@ -495,7 +479,7 @@ function renderRunSteps(current: RunPhase): void {
   );
 }
 
-/** Puts the card's words on the step now running, so it names one step at a time. */
+/** Show the card's copy for the running step, so it names one step at a time. */
 function showRunPhase(phase: RunPhase): void {
   const copy = runPhaseCopy(phase);
   processingStatus.textContent = copy.detail;
@@ -503,7 +487,7 @@ function showRunPhase(phase: RunPhase): void {
   renderRunSteps(phase);
 }
 
-/** Opens the card on the first step, with the bar animating until a count arrives. */
+/** Open the card on the first step, with the bar animating until a count arrives. */
 function startRunProgress(total: number): void {
   showRunProgress({ phase: "verifying", completed: 0, total });
 }
@@ -512,11 +496,9 @@ function showRunProgress(progress: RunProgress): void {
   const view = runProgressView(progress, activeRunPhaseList);
   showRunPhase(progress.phase);
 
-  /* A phase that has not counted a row yet has no position to show: Smarty answers
-     a whole batch of addresses in one request, so verification has nothing to
-     report until it is done. Leave the bar animating rather than parked at a
-     figure it cannot move off, and drop the value a screen reader would read as
-     precise. */
+  /* A phase with no rows counted has no position to show: Smarty answers a whole
+     batch in one request, so verification reports nothing until it is done. Keep
+     the bar animating and drop the value a screen reader would read as precise. */
   const counting = progress.completed > 0;
   processingBar.dataset.state = counting ? "determinate" : "indeterminate";
   if (counting) {
@@ -554,7 +536,7 @@ async function performChecks(): Promise<void> {
 
   const { blocker } = settingsPanel.credentialView();
   if (blocker !== undefined) {
-    window.alert(blocker);
+    notifier.failure(blocker);
     showSettings(true);
     settingsPanel.openCredentials();
     return;
@@ -576,8 +558,8 @@ async function performChecks(): Promise<void> {
   try {
     const mapping = currentMapping();
     const validation = await bridge.spreadsheet.validate(selectedSpreadsheet.fileName, mapping);
-    /* Moved on as soon as verification lands rather than when the next step first
-       reports, so the bar never credits reading the sheet again to the step behind it. */
+    /* Advance as soon as verification lands, not when the next phase first reports,
+       so re-reading the sheet is not credited to verification. */
     const firstUsdaPhase = activeRunPhaseList[1];
     if (firstUsdaPhase !== undefined) {
       showRunProgress({ phase: firstUsdaPhase, completed: 0, total: selectedSpreadsheet.rowCount });
@@ -604,8 +586,8 @@ async function performChecks(): Promise<void> {
 }
 
 /*
- * The run button disables itself while a run is going, but the step rail can reach
- * "Next: choose checks" again meanwhile, which would pass a second run through.
+ * The run button disables itself during a run, but the step rail can reach "Next:
+ * choose checks" again meanwhile, which would start a second run.
  */
 const runChecks = singleFlight(performChecks);
 
@@ -640,7 +622,7 @@ function setDownloadLoading(loading: boolean): void {
   downloadLabel.textContent = loading ? "Saving" : exportButtonLabel();
 }
 
-/** Returns the button to its pre-export state; called each time results are shown. */
+/** Return the button to its pre-export state; called each time results are shown. */
 function resetExportButton(): void {
   resultsExported = false;
   downloadLabel.textContent = exportButtonLabel();
@@ -725,15 +707,14 @@ downloadResultsButton.addEventListener("click", (): void => {
   void (resultsExported ? openExportedFile() : exportResults());
 });
 
-/*
- * Startup fails before any view is on screen, so the only surface that is certainly
- * visible is a dialog.
- */
+/* Startup fails before any view is on screen, so only a dialog is certain to be seen. */
 function reportStartupError(error: unknown): void {
-  window.alert(friendlyMessage(error, "Unable to start vibeCheck."));
+  notifier.failure(friendlyMessage(error, "Unable to start vibeCheck."));
 }
 
 const homeCredentialNotice = getRequiredElement<HTMLElement>("#home-credential-notice");
+const homeCredentialNoticeText = getRequiredElement<HTMLElement>("#home-credential-notice-text");
+const homeStartButton = getRequiredElement<HTMLButtonElement>("#home-start");
 
 const settingsPanel = createSettingsPanel({
   getPreferences: () => preferences,
@@ -748,9 +729,14 @@ const settingsPanel = createSettingsPanel({
       renderMapping(selectedSpreadsheet);
     }
   },
-  onCredentialStateChange: ({ homeNotice }): void => {
-    homeCredentialNotice.textContent = homeNotice ?? "";
+  notifier,
+  onCredentialStateChange: ({ blocker, homeNotice, tone }): void => {
+    homeCredentialNoticeText.textContent = homeNotice ?? "";
     homeCredentialNotice.hidden = homeNotice === undefined;
+    homeCredentialNotice.dataset.tone = tone;
+    /* Held back until the key can run checks; the notice beside it says why. */
+    homeStartButton.disabled = blocker !== undefined;
+    homeStartButton.classList.toggle("is-active", blocker === undefined);
   },
 });
 
@@ -809,24 +795,19 @@ function renderHomeSteps(): void {
 
 getRequiredElement<HTMLButtonElement>("#home-link").addEventListener("click", (): void => {
   showView("home");
-  getRequiredElement<HTMLButtonElement>("#home-start").focus();
+  homeStartButton.focus();
 });
 
-getRequiredElement<HTMLButtonElement>("#home-start").addEventListener("click", (): void => {
-  /* A run needs a key Smarty accepts, so send a partner without one straight to
-     the credentials screen rather than into an upload that would only fail. */
-  if (settingsPanel.credentialView().blocker !== undefined) {
-    showSettings(true);
-    settingsPanel.openCredentials();
-    return;
-  }
+/* Only enabled once the key can run checks, so it goes straight to the upload. */
+homeStartButton.addEventListener("click", (): void => {
   showView("workflow");
   uploadExcelButton.focus();
 });
 
-getRequiredElement<HTMLAnchorElement>("#home-settings-link").addEventListener("click", (event): void => {
+getRequiredElement<HTMLAnchorElement>("#home-credential-notice-link").addEventListener("click", (event): void => {
   event.preventDefault();
   showSettings(true);
+  settingsPanel.openCredentials();
 });
 
 settingsToggle.addEventListener("click", (): void => showSettings(settingsView.hidden !== false));

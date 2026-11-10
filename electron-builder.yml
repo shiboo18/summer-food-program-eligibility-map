@@ -24,11 +24,10 @@ npmRebuild: false
 
 asar: true
 
-# Electron fuses, flipped in the packaged binary. The partner's addresses and their
-# Smarty credentials are only as private as the process that reads them, so the ways
-# of turning that process into a general-purpose Node runtime are closed off.
-# resetAdHocDarwinSignature is required because flipping a fuse invalidates the
-# signature of the unsigned macOS build above.
+# Electron fuses, flipped in the packaged binary. Addresses and Smarty credentials
+# are only as private as the process that reads them, so the ways of turning it into
+# a general-purpose Node runtime are closed. resetAdHocDarwinSignature is required
+# because flipping a fuse invalidates the unsigned macOS build's signature.
 electronFuses:
   runAsNode: false
   enableNodeCliInspectArguments: false
@@ -36,10 +35,9 @@ electronFuses:
   onlyLoadAppFromAsar: true
   resetAdHocDarwinSignature: true
 
-# Explicit whitelist so packaging pulls only compiled output, the workspace
-# package manifests, and the root manifest — not the whole monorepo. Production
-# dependencies (e.g. smartystreets-javascript-sdk, hoisted to the root
-# node_modules) are added automatically by electron-builder.
+# Explicit allowlist: only compiled output and the package manifests, not the
+# whole monorepo. electron-builder adds the production dependencies hoisted to
+# the root node_modules.
 files:
   - "package.json"
   - "packages/desktop/dist/**/*"
@@ -55,10 +53,9 @@ artifactName: "vibeCheck-${version}-${arch}.${ext}"
 publish: null
 
 mac:
-  # Unsigned local artifacts by default: no certificate, no notarization.
-  # Gatekeeper will warn on first launch. To sign later, add a Developer ID
-  # (or internal) identity and the corresponding hardenedRuntime/notarize
-  # settings — do not set placeholder values here.
+  # Unsigned by default: no certificate or notarization, so Gatekeeper warns on
+  # first launch. Signing needs a Developer ID (or internal) identity plus the
+  # hardenedRuntime/notarize settings; do not set placeholder values here.
   identity: null
   category: public.app-category.productivity
   icon: build-resources/icon.icns
@@ -69,9 +66,9 @@ mac:
       arch: [universal]
 
 win:
-  # Unsigned by default: no certificateFile / certificateSubjectName, so
-  # cross-builds from macOS are deterministic. Unsigned installers trigger
-  # SmartScreen warnings. To sign later, supply CSC_LINK / CSC_KEY_PASSWORD.
+  # Unsigned by default so cross-builds from macOS are deterministic; unsigned
+  # installers trigger SmartScreen warnings. Signing needs CSC_LINK /
+  # CSC_KEY_PASSWORD.
   signAndEditExecutable: false
   icon: build-resources/icon.ico
   # One installer carrying both architectures; Windows has no universal binary,

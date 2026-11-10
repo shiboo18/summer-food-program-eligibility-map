@@ -14,6 +14,7 @@ import { toCredentialInput, toSmartyCredentials } from "../../../../backend/dist
 import { SMARTY_API_KEYS_URL } from "../../../../backend/dist/config/constants.js";
 import { friendlyMessage } from "../../shared/text.js";
 import { getRequiredElement } from "../dom.js";
+import type { Notifier } from "../notifier.js";
 import { latestOnly } from "../workflow/latest-only.js";
 import { singleFlight } from "../workflow/single-flight.js";
 import { credentialFields, type SmartyCredential } from "./credential-fields.js";
@@ -27,29 +28,30 @@ import { createDialog } from "./dialog.js";
 export interface SettingsPanelPorts {
   getPreferences(): Preferences;
   updatePreferences(patch: Partial<Preferences>): Promise<void>;
-  /** Adopts preferences returned by a direct bridge call, such as a delete. */
+  /** Adopt preferences returned by a direct bridge call, such as a delete. */
   adoptPreferences(next: Preferences): void;
-  /** Mirrors new check defaults onto the Checks step so both agree. */
+  /** Mirror new check defaults onto the Checks step. */
   applyCheckDefaults(selection: CachedCheckSelection): void;
-  /** Mirrors newly saved header cells onto the Map columns step so both agree. */
+  /** Mirror newly saved header cells onto the Map columns step. */
   applyColumnDefaults(): void;
   /** Called whenever the stored key's state changes, so other screens can reflect it. */
   onCredentialStateChange(view: CredentialStatusView): void;
+  /** Confirms saves and asks before clearing; errors inside a dialog stay in its message area. */
+  readonly notifier: Notifier;
 }
 
 export interface SettingsPanel {
-  /** Re-renders every control from the current preferences. */
+  /** Re-render every control from the current preferences. */
   refresh(): void;
   openCredentials(): void;
   /**
-   * Shows which halves of the key are stored. Half a key or none reads as not
-   * set straight away; a whole key reads as checking until Smarty's verdict on
-   * it is shown.
+   * Show which halves of the key are stored. Half a key or none reads as not set
+   * at once; a whole key reads as checking until Smarty's verdict arrives.
    */
   showStoredCredentials(status: CredentialStatus): void;
-  /** Asks Smarty about the stored key in the background; never rejects. */
+  /** Ask Smarty about the stored key in the background; never rejects. */
   checkCredentials(): Promise<void>;
-  /** The stored key's state as last shown. */
+  /** Return the stored key's state as last shown. */
   credentialView(): CredentialStatusView;
 }
 
@@ -63,13 +65,20 @@ const cellLabels = new Map<AddressField, string>(
 export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   const bridge = window.shareOurStrengths;
 
-  /* Smarty credentials. Secrets live in a modal; Settings shows only Smarty's
-     verdict on them, in the group and again inside the modal. */
+  /* Smarty credentials. Secrets are entered in a modal; Settings shows only
+     Smarty's verdict, in the group and again in the modal. */
   const credentialFieldsContainer = getRequiredElement<HTMLElement>("#credential-fields");
-  const credentialStatusLines = [
-    getRequiredElement<HTMLElement>("#credential-status"),
-    getRequiredElement<HTMLElement>("#credential-dialog-status"),
-  ];
+  const settingsStatusLine = getRequiredElement<HTMLElement>("#credential-status");
+  const dialogStatusLine = getRequiredElement<HTMLElement>("#credential-dialog-status");
+  const credentialStatusLines = [settingsStatusLine, dialogStatusLine];
+
+  /* Both lines show the same status, so only the one on screen is a live
+     region; otherwise a screen reader announces every change twice. */
+  function announceFrom(line: HTMLElement): void {
+    for (const each of credentialStatusLines) {
+      each.setAttribute("aria-live", each === line ? "polite" : "off");
+    }
+  }
   const openCredentialsButton = getRequiredElement<HTMLButtonElement>("#open-credentials");
   const settingsForm = getRequiredElement<HTMLFormElement>("#settings-form");
   const settingsMessage = getRequiredElement<HTMLElement>("#settings-message");
@@ -118,8 +127,10 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
       settingsMessage.textContent = "";
       settingsMessage.dataset.state = "idle";
       updateSaveAvailability();
+      announceFrom(dialogStatusLine);
       credentialInputs.get(credentialFields[0]?.name ?? "smartyAuthId")?.focus();
     },
+    onClose: (): void => announceFrom(settingsStatusLine),
   });
 
   const settingsFailure = "Unable to update settings.";
@@ -134,7 +145,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
 
   /** For controls with no message element of their own; a silent failure is worse. */
   function reportError(error: unknown): void {
-    window.alert(friendlyMessage(error, settingsFailure));
+    ports.notifier.failure(friendlyMessage(error, settingsFailure));
   }
 
   let credentialState: CredentialDisplayState = "checking";
@@ -164,9 +175,9 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     showCredentialState(wholeKey ? "checking" : "not-set");
   }
 
-  /* Every answer about the key goes through here, so a slower answer about a key
-     the partner has since replaced or cleared never overwrites the newer one. A
-     save or a clear already knows its answer, so it passes it in. */
+  /* Every answer about the key goes through here, so a slow answer about a key
+     since replaced or cleared never overwrites a newer one. A save or a clear
+     already knows its answer and passes it in. */
   const showLatestCheck = latestOnly(
     async (known?: CredentialCheck): Promise<CredentialCheck> => known ?? bridge.settings.verify(),
     showCredentialState,
@@ -190,9 +201,8 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     }
   });
 
-  /* Smarty is asked before anything is stored, which can take seconds. Save is
-     greyed out meanwhile, and a second press is ignored rather than sending a
-     second save and showing a second confirmation. */
+  /* Smarty is asked before anything is stored, which can take seconds, so a second
+     press is ignored rather than sending a second save. */
   const saveCredentials = singleFlight(async (credentials: SmartyCredentials): Promise<void> => {
     saveCredentialsButton.disabled = true;
     saveCredentialsButton.classList.remove("is-active");
@@ -209,8 +219,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
       showStoredCredentials(status);
       void showLatestCheck(check);
       credentialDialog.close();
-      /* The system's own pop-up, matching the confirm before a clear. */
-      window.alert("Credentials saved securely.");
+      ports.notifier.success("Credentials saved securely.");
     } catch (error: unknown) {
       reportOn(settingsMessage)(error);
     } finally {
@@ -219,7 +228,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   });
 
   getRequiredElement<HTMLButtonElement>("#clear-settings").addEventListener("click", (): void => {
-    if (!window.confirm("Clear stored Smarty credentials?")) {
+    if (!ports.notifier.confirm("Clear stored Smarty credentials?")) {
       return;
     }
     void bridge.settings
@@ -229,13 +238,13 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
         showStoredCredentials(status);
         void showLatestCheck("not-set");
         credentialDialog.close();
-        window.alert("Stored credentials cleared.");
+        ports.notifier.success("Stored credentials cleared.");
       })
       .catch(reportOn(settingsMessage));
   });
 
-  /* Map Columns. Files are named differently each time, so the user pins the
-     header cell for each column rather than a column name. */
+  /* Map columns. Column names differ between files, so the user pins each
+     field's header cell rather than a name. */
   const addressCells = getRequiredElement<HTMLElement>("#default-columns");
   const columnsForm = getRequiredElement<HTMLFormElement>("#column-settings-form");
   const columnsMessage = getRequiredElement<HTMLElement>("#column-settings-message");
@@ -243,7 +252,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   const cellInputs = new Map<AddressField, HTMLInputElement>();
   const requiredCells = new Set<AddressField>();
 
-  createDialog("#columns-overlay", openColumnsButton, {
+  const columnsDialog = createDialog("#columns-overlay", openColumnsButton, {
     closeLabel: "Close map columns",
     onOpen: (): void => {
       columnsMessage.textContent = "";
@@ -329,14 +338,14 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
       .updatePreferences({ columnMapping: result.cells })
       .then((): void => {
         ports.applyColumnDefaults();
-        columnsMessage.textContent = "Header cells saved.";
-        columnsMessage.dataset.state = "success";
+        columnsDialog.close();
+        ports.notifier.success("Header cells saved.");
       })
       .catch(reportOn(columnsMessage, "Unable to save header cells."));
   });
 
   getRequiredElement<HTMLButtonElement>("#clear-column-mapping").addEventListener("click", (): void => {
-    if (!window.confirm("Clear the saved header cells?")) {
+    if (!ports.notifier.confirm("Clear the saved header cells?")) {
       return;
     }
     void bridge.preferences
@@ -345,8 +354,8 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
         ports.adoptPreferences(stored);
         renderCellFields();
         ports.applyColumnDefaults();
-        columnsMessage.textContent = "Saved cells cleared.";
-        columnsMessage.dataset.state = "success";
+        columnsDialog.close();
+        ports.notifier.success("Saved cells cleared.");
       })
       .catch(reportOn(columnsMessage));
   });

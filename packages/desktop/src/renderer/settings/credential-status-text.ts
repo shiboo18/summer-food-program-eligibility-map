@@ -12,23 +12,23 @@ export interface CredentialStatusView {
   readonly tone: CredentialTone;
   /** Why a run cannot start with the stored key; absent when it can. */
   readonly blocker?: string;
-  /** What the home page says about the key; absent when it should say nothing. */
+  /** What the home page says about the key, beside a link to Settings; present exactly when `blocker` is. */
   readonly homeNotice?: string;
   /** Why a key with this answer was not stored; absent when such a key is stored. */
   readonly refusedSave?: string;
 }
 
 /*
- * "Configured" only ever meant "stored", and partners read it, with its check
- * mark, as "working". A key Smarty accepts needs no comment, so only a problem,
- * or a check under way, earns a status line. An unanswered check blocks
- * nothing: the key may well be fine, and a run will say if not.
+ * A key Smarty accepts needs no comment, so only a problem or a check under way
+ * gets a status line. An unanswered check blocks nothing: the key may be fine,
+ * and a run will say if not.
  */
 const views: Readonly<Record<CredentialDisplayState, CredentialStatusView>> = {
   "not-set": {
     text: "Not set up yet",
     tone: "idle",
     blocker: "Add your Smarty secret key in Settings before running checks.",
+    homeNotice: "Add your Smarty secret key to get started.",
   },
   checking: { text: "Checking with Smarty…", tone: "pending" },
   validated: { text: "", tone: "success" },
@@ -36,7 +36,7 @@ const views: Readonly<Record<CredentialDisplayState, CredentialStatusView>> = {
     text: "Smarty didn't accept these. Use the Auth ID and Auth Token from a Smarty secret key, not your Smarty login.",
     tone: "error",
     blocker: "Smarty didn't accept your saved key. Update it in Settings before running checks.",
-    homeNotice: "Smarty didn't accept your saved key. Update it in Settings before you start.",
+    homeNotice: "Smarty didn't accept your saved key. Update it to get started.",
     refusedSave:
       "Smarty didn't accept this key, so it wasn't saved. Use the Auth ID and Auth Token from a Smarty secret key, not your Smarty login.",
   },

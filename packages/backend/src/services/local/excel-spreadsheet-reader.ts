@@ -23,7 +23,7 @@ const badFill = "FFF6D6D6";
 const neutralFill = "FFF2F2F2";
 const correctedFill = "FFFCE9C8";
 
-/** Reads and updates Excel workbooks with ExcelJS so no custom spreadsheet parsing is required. */
+/** Reads and annotates Excel workbooks with ExcelJS. */
 export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWriter {
   public async readSummary(filePath: string): Promise<SpreadsheetSummary> {
     const sheet = await loadFirstSheet(filePath);
@@ -183,12 +183,10 @@ async function loadFirstSheet(filePath: string): Promise<ExcelJS.Worksheet> {
 }
 
 /**
- * Checks the file is there and readable before it is parsed.
+ * Check the file exists and is readable before it is parsed.
  *
- * The three failures call for different actions — find the file, fix its
- * permissions, or export it as .xlsx — so they are reported apart. This is checked
- * here rather than inferred from the parser's failure, which reports a missing file
- * and a corrupt one alike.
+ * A missing file, a permissions problem, and a non-workbook need different fixes,
+ * but the parser reports them alike, so the first two are checked here.
  *
  * @throws Error naming the failure in the partner's terms.
  */

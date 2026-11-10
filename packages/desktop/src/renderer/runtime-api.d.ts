@@ -41,7 +41,7 @@ declare global {
       getRuntimeInfo(): RuntimeInfo;
       readonly spreadsheet: {
         open(): Promise<SpreadsheetSelection | null>;
-        /** Reveals the opened workbook in the OS file manager. */
+        /** Reveal the opened workbook in the OS file manager. */
         reveal(fileName: string): Promise<void>;
         validate(fileName: string, mapping: ColumnMapping): Promise<ValidationReport>;
       };
@@ -50,19 +50,19 @@ declare global {
       };
       readonly results: {
         export(fileName: string): Promise<ExportResult>;
-        /** Reveals the exported copy in the OS file manager. */
+        /** Reveal the exported copy in the OS file manager. */
         reveal(fileName: string): Promise<void>;
       };
       readonly run: {
-        /** Subscribes to a run's progress. Returns the unsubscribe function. */
+        /** Subscribe to a run's progress. Returns the unsubscribe function. */
         onProgress(listener: (progress: RunProgress) => void): () => void;
       };
       readonly settings: {
         getStatus(): Promise<CredentialStatus>;
-        /** Stores the typed halves unless Smarty refuses the key they would leave stored. */
+        /** Store the typed halves unless Smarty refuses the key they would leave stored. */
         save(input: CredentialInput): Promise<CredentialSaveResult>;
         clear(): Promise<CredentialStatus>;
-        /** Asks Smarty about the stored key. Resolves `"not-set"` without asking when half or all of it is missing. */
+        /** Ask Smarty about the stored key. Resolves `"not-set"` without asking when any half is missing. */
         verify(): Promise<CredentialCheck>;
       };
       readonly preferences: {

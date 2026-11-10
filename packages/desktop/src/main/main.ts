@@ -116,11 +116,10 @@ function columnMappingKey(mapping: ColumnMapping): string {
 }
 
 /**
- * A reporter that forwards a phase's progress to the frame that asked for the run,
- * so the screen can fill its bar as the work goes rather than only when it lands.
+ * Return a reporter that forwards a phase's progress to the frame that asked for
+ * the run, so the screen's bar fills as the work goes.
  *
- * @param total Every data row the sheet holds, which is what both phases work
- *   through, so one bar spans the whole run.
+ * @param total The rows the phase works through.
  */
 function reportProgressTo(event: IpcMainInvokeEvent, phase: RunPhase, total: number): ProgressReporter {
   return (completed: number): void => {
@@ -140,8 +139,8 @@ function assertTrustedSender(event: IpcMainInvokeEvent): void {
 }
 
 /**
- * Resolves an untrusted file name to a workbook this process opened through the
- * native dialog, so a file path can never come from the renderer.
+ * Resolve an untrusted file name to a workbook this process opened through the
+ * native dialog, so a file path never comes from the renderer.
  */
 function requireOpenedSpreadsheet(
   opened: Map<string, SpreadsheetSummary>,
@@ -159,7 +158,6 @@ function requireOpenedSpreadsheet(
 
 function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesService): void {
   const reader = new ExcelSpreadsheetReader();
-  /* One provider of the stored key, shared by the run, the background check and saves. */
   const storedCredentials = createSmartyCredentialsProvider(settings);
   const validation = new SpreadsheetValidationService(reader, new SmartyAddressValidator(storedCredentials));
   const credentialVerifier = new SmartyCredentialVerifier();
@@ -168,14 +166,14 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
   const openedSpreadsheets = new Map<string, SpreadsheetSummary>();
   /** Smarty coordinates from the most recent validation, reused by eligibility so Smarty is called once. */
   const smartyLocations = new Map<string, ReadonlyMap<number, ValidatedLocation>>();
-  /** Per-row Smarty verification (status + standardized address), reused by eligibility for the annotation. */
+  /** Per-row Smarty verification, reused by eligibility for the annotation. */
   const rowVerifications = new Map<string, ReadonlyMap<number, RowVerification>>();
   /** The most recent per-row result annotations, written to a copy only when the user downloads. */
   const lastAnnotations = new Map<string, { annotations: readonly ResultAnnotation[]; checks: EligibilityChecks }>();
   /** Where each file's results were last exported, so the renderer can reveal it by name, never by path. */
   const exportedPaths = new Map<string, string>();
   /** Rows parsed during validation, reused by the eligibility pass so a run reads the
-      workbook once. The mapping key guards a re-run under remapped columns from reusing rows read under the old mapping. */
+      workbook once. Keyed by mapping, so remapped columns are read afresh. */
   const parsedRows = new Map<string, { readonly mappingKey: string; readonly rows: AddressRowsResult }>();
 
   ipcMain.handle("spreadsheet:open", async (event): Promise<unknown> => {
@@ -240,17 +238,14 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
 
     const columnMapping = parseColumnMapping(mapping, summary.headers);
     const selectedChecks = toEligibilityChecks(checks);
-    /* Reuse the rows validation already parsed when the mapping is unchanged, so a
-       run reads the workbook once; re-read if the columns were remapped since. */
     const cachedRows = parsedRows.get(summary.fileName);
     const { rows, skipped } =
       cachedRows?.mappingKey === columnMappingKey(columnMapping)
         ? cachedRows.rows
         : await reader.readAddressRows(summary.filePath, columnMapping);
 
-    /* An address Smarty could not verify is not put through the USDA checks — a
-       result would have no verified location to stand on — so it is set aside up
-       front and reported as needing verification rather than checked. */
+    /* Rows Smarty could not verify have no verified location, so they skip the USDA
+       checks and are reported as needing verification. */
     const verifications = rowVerifications.get(summary.fileName) ?? new Map<number, RowVerification>();
     const isDeliverable = (rowNumber: number): boolean => {
       const status = verifications.get(rowNumber)?.status;
@@ -260,12 +255,12 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
     const unverified = rows.filter((row) => !isDeliverable(row.rowNumber)).map((row) => row.rowNumber);
 
     /* Each USDA pass reports under its own phase so the run screen can name the
-       step now running. Locating shares a phase's slice with the check behind it,
-       so the bar fills end to end rather than one slice per pass.
+       running step. Locating shares a slice with the check after it, so the bar
+       fills end to end.
 
        When both checks run they go out concurrently: they hit different hosts, so
-       neither sees more than USDA_CHECK_CONCURRENCY at once, and their combined
-       progress walks the second slice forward as either pass finishes a row. */
+       neither exceeds USDA_CHECK_CONCURRENCY, and their combined progress drives
+       the second slice. */
     const runConcurrently = selectedChecks.rural && selectedChecks.area;
     let locating: ProgressReporter | undefined;
     let ruralCheck: ProgressReporter | undefined;
@@ -358,8 +353,8 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
     return { canceled: false, filePath: selection.filePath, rowsAnnotated: cached.annotations.length };
   });
 
-  /* Reveals the exported copy in the OS file manager. The path is looked up here by
-     file name, so it never has to travel through the renderer. */
+  /* The exported path is looked up by file name, so it never travels through the
+     renderer. */
   ipcMain.handle("results:reveal", (event, fileName: unknown): void => {
     assertTrustedSender(event);
     const summary = requireOpenedSpreadsheet(openedSpreadsheets, fileName);

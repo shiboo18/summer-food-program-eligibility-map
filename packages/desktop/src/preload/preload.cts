@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-/* Type-only imports are erased at compile time, so the contracts stay in one
-   place without giving this CommonJS preload a runtime dependency. */
+/* Type-only imports are erased at compile time, so this CommonJS preload shares
+   the contracts without a runtime dependency. */
 import type {
   ColumnMapping,
   CredentialCheck,

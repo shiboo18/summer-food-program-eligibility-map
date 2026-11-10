@@ -46,8 +46,7 @@ describe("SettingsStore", () => {
     expect(await store.getCredentials()).toEqual({ smartyAuthId: "new-id", smartyAuthToken: "new-token" });
   });
 
-  /* A save writes the whole key afresh, so an unreadable file is replaced rather
-     than blocking every save until the partner finds Clear. */
+  /* Otherwise an unreadable file would block every save until it was cleared. */
   test("saves over a credentials file that cannot be read", async () => {
     const directory = await mkdtemp(join(tmpdir(), "share-our-strengths-"));
     directories.push(directory);

@@ -16,9 +16,9 @@ export interface AddressFieldDescriptor {
 }
 
 /**
- * The address fields in form order. This one table drives the mapping selects,
- * the guessed column, the Settings dropdowns, and the mapping sent to the backend,
- * so adding a field is a single edit here plus its select in index.html.
+ * The address fields in form order. This table drives the mapping selects, the
+ * column guesses, the Settings dropdowns, and the mapping sent to the backend, so
+ * adding a field is an edit here plus its select in index.html.
  */
 export const addressFields: readonly AddressFieldDescriptor[] = [
   { field: "line1", label: "Street address", optional: false, candidates: ["address", "street", "line1"] },
@@ -44,31 +44,28 @@ function inUse(descriptor: AddressFieldDescriptor, chosen: Readonly<Record<Addre
 }
 
 /**
- * The columns the address fields after `changed` should take once `changed` has
- * been given its own.
+ * Return the columns the fields after `changed` should take once `changed` has
+ * its own.
  *
  * Partners keep the parts of an address in adjacent columns, so each field in use
- * takes the next column along in [addressFields] order — the same assumption the
- * Settings dialog makes of a group's first header cell. A field left unused takes
- * no column *and occupies none*, so the fields after it move up to close the gap:
- * a sheet with no second address line has its city beside the street.
+ * takes the next column in [addressFields] order. An unused field occupies no
+ * column, so the fields after it move up: a sheet with no second address line has
+ * its city beside the street.
  *
  * @param changed The field whose column was just chosen.
- * @param chosen Every field's column as the screen currently holds it, `changed`
- *   included. An empty name means the field is not in use.
- * @returns A column name for each field after `changed`, in [addressFields] order;
- *   fields at or before it are absent, so choosing one never disturbs the answers
- *   already given. A name is empty where the field is unused, where the column that
- *   far along does not exist or is unnamed, or where nothing up to `changed` names a
- *   column at all.
+ * @param chosen Every field's column as the screen holds it, `changed` included.
+ *   An empty name means the field is not in use.
+ * @returns A column name for each field after `changed`; fields at or before it
+ *   are absent, so answers already given are never disturbed. A name is empty
+ *   where the field is unused, the column that far along does not exist or is
+ *   unnamed, or nothing up to `changed` names a column.
  */
 export function followingHeaders(
   changed: AddressField,
   chosen: Readonly<Record<AddressField, string>>,
   headers: readonly string[],
 ): Readonly<Partial<Record<AddressField, string>>> {
-  /* A field's slot is its place among the fields in use rather than its place in
-     the form, which is what lets an unused one close the gap behind it. */
+  /* A slot counts only the fields in use, which lets an unused field close the gap. */
   const slots = new Map<AddressField, number>();
   for (const descriptor of addressFields) {
     if (inUse(descriptor, chosen)) {
@@ -77,9 +74,9 @@ export function followingHeaders(
   }
 
   const at = addressFields.findIndex(({ field }) => field === changed);
-  /* Counted from the nearest field up to and including the change that still names
-     a column: setting the second line to "not used" leaves the fields after it
-     following the street instead. */
+  /* Count from the nearest field, up to and including `changed`, that still names a
+     column: setting line 2 to "not used" leaves the fields after it following the
+     street. */
   let from: { readonly column: number; readonly slot: number } | undefined;
   for (const { field } of addressFields.slice(0, at + 1).reverse()) {
     const column = columnOf(chosen[field], headers);
@@ -100,9 +97,9 @@ export function followingHeaders(
 }
 
 /**
- * Restates a chosen mapping as the header cells preferences are stored in. Column
- * names cannot be stored: the cache keeps cells only, so saving names wipes the
- * mapping. A column this sheet no longer has is dropped rather than saved stale.
+ * Convert a chosen mapping to the header cells preferences are stored in. The
+ * cache keeps cells only and drops anything else, so names cannot be stored. A
+ * column this sheet does not have is dropped rather than saved stale.
  *
  * @param headerRow Sheet row the names were read from, so the stored cell reads
  *   the way it does in the file even when a legend row sits above the names.
@@ -142,10 +139,9 @@ function guessHeader(headers: readonly string[], candidates: readonly string[]):
 }
 
 /**
- * The column a mapping select should offer for one field: the saved cell's column
- * when it still names one in this file, otherwise a guess from the field's
- * candidates, otherwise nothing. The saved cell wins so the screen shows what was
- * kept rather than what a column name suggests.
+ * Return the column a mapping select should offer for one field: the saved
+ * cell's column when it names one in this file, else a guess from the field's
+ * candidates, else nothing. The saved cell wins so the screen shows what was kept.
  */
 export function preferredHeader(
   cell: string | undefined,

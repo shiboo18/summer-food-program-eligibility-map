@@ -32,10 +32,8 @@ export class UsdaSummerMealBenefitChecker implements SummerMealBenefitChecker {
     rows: readonly LocatedRow[],
     onProgress?: ProgressReporter,
   ): Promise<ReadonlyMap<number, CheckOutcome<AreaEligibilityResult>>> {
-    /* Rows at the same coordinate share one in-flight lookup, so a duplicate
-       never issues its own request and takes the first row's outcome — including
-       a failure, which is therefore reported alike rather than retried. Scoped to
-       this call, so there is no state to invalidate between runs. */
+    /* Rows at the same coordinate share one in-flight lookup and its outcome,
+       failures included. Scoped to this call, so nothing outlives the run. */
     const byCoordinate = new Map<string, Promise<AreaEligibilityResult>>();
     const outcomes = await mapWithConcurrency(
       rows,

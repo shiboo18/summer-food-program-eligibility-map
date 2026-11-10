@@ -58,7 +58,6 @@ export class SmartyAddressValidator implements AddressValidator {
     return results;
   }
 
-  /** The stored key, confirmed present before any request is built. */
   private async getAndResolveCredentials(): Promise<SmartyCredentials> {
     const credentials = await this.getCredentials();
     if (credentials === undefined) {
@@ -125,9 +124,8 @@ function candidateToLocation(
   if (latitude === undefined || longitude === undefined) {
     return undefined;
   }
-  /* A Smarty candidate IS the USPS address, so the match itself is not in doubt
-     and the score is full. What varies is how tightly the point is placed, which
-     the precision class carries. */
+  /* A Smarty candidate is the USPS address, so the match is certain and the score
+     is full; the precision class carries how tightly the point is placed. */
   return { lat: latitude, lng: longitude, score: 100, precision: toPrecision(precision) };
 }
 

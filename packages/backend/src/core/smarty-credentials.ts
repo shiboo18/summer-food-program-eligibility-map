@@ -10,8 +10,8 @@ import type {
 const INCOMPLETE_KEY_MESSAGE = "Enter both the Auth ID and the Auth Token.";
 
 /**
- * Builds a whole key from the halves the form sent or the store holds, trimmed;
- * `undefined` when either half is blank or absent. The one way halves become a key.
+ * Build a whole, trimmed key from the halves the form sent or the store holds;
+ * `undefined` when either half is blank or absent.
  */
 export function toSmartyCredentials(input: CredentialInput): SmartyCredentials | undefined {
   const authId = input.smartyAuthId?.trim() ?? "";
@@ -19,12 +19,12 @@ export function toSmartyCredentials(input: CredentialInput): SmartyCredentials |
   return authId && authToken ? { authId, authToken } : undefined;
 }
 
-/** Names a key's halves the way the store and the form do; the reverse of `toSmartyCredentials`. */
+/** Name a key's halves the way the store and the form do; the reverse of `toSmartyCredentials`. */
 export function toCredentialInput({ authId, authToken }: SmartyCredentials): CredentialInput {
   return { smartyAuthId: authId, smartyAuthToken: authToken };
 }
 
-/** Reports the stored key's state for the renderer: not set, or Smarty's verdict, never the key. */
+/** Report the stored key's state for the renderer: not set, or Smarty's verdict, never the key. */
 export async function checkStoredCredentials(
   getStored: () => Promise<SmartyCredentials | undefined>,
   verifier: CredentialVerifier,
@@ -54,17 +54,14 @@ export interface CredentialSaveOutcome {
 
 export interface CredentialSavePorts {
   /**
-   * Replaces whatever key is stored. Called only for a key Smarty does not
-   * refuse; rejects with a partner-facing message when it cannot store.
+   * Replace the stored key. Called only for a key Smarty does not refuse;
+   * rejects with a partner-facing message when it cannot store.
    */
   readonly store: (credentials: SmartyCredentials) => Promise<void>;
   readonly verifier: CredentialVerifier;
 }
 
-/**
- * Stores a whole key unless Smarty refuses it. Rejects when given no whole key,
- * or when the store itself fails.
- */
+/** Store a whole key unless Smarty refuses it. Rejects when given no whole key, or when the store fails. */
 export async function saveAcceptedCredentials(
   credentials: SmartyCredentials | undefined,
   ports: CredentialSavePorts,

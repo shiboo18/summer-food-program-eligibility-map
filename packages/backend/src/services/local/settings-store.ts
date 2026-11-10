@@ -12,7 +12,7 @@ import type {
 /** Longer than any real Smarty key half, short enough to refuse pasted prose. */
 const maximumCredentialLength = 4096;
 
-/** The Smarty secrets this store holds. Every credential loop walks this list. */
+/** The Smarty secrets this store holds. */
 const smartyCredentials: readonly SmartyCredential[] = ["smartyAuthId", "smartyAuthToken"];
 
 export interface SecretProtector {
@@ -43,8 +43,8 @@ export class SettingsStore {
   }
 
   /**
-   * Replaces the stored key with this one. The whole file is written afresh, so
-   * an unreadable one is replaced rather than blocking every save.
+   * Replace the stored key. The whole file is written afresh, so an unreadable
+   * one is replaced rather than blocking every save.
    */
   public async save({ authId, authToken }: SmartyCredentials): Promise<CredentialStatus> {
     if (!this.protector.isEncryptionAvailable()) {
@@ -78,9 +78,9 @@ export class SettingsStore {
   }
 
   /**
-   * Stored credentials become unreadable if the operating-system key changes,
-   * for example when the application name changes. Treat them as absent so the
-   * user is asked to enter them again instead of hitting a decryption failure.
+   * Stored credentials become unreadable if the operating-system key changes, for
+   * example when the application name changes. Treat them as absent so the user
+   * re-enters them instead of hitting a decryption failure.
    */
   private decrypt(value: string | undefined): string | undefined {
     if (value === undefined) {
@@ -137,7 +137,7 @@ export class SettingsStore {
   }
 }
 
-/** Reads credentials sent from the renderer, rejecting anything that is not one. */
+/** Parse credentials sent from the renderer, rejecting anything malformed. */
 export function parseCredentialInput(value: unknown): CredentialInput {
   if (typeof value !== "object" || value === null) {
     throw new Error("Credential settings are invalid.");

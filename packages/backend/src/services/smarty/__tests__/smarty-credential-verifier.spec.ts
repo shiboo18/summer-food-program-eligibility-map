@@ -61,8 +61,6 @@ describe("SmartyCredentialVerifier", () => {
     expect(requests[0].search).toContain("auth-token=a%26b%3Dc%2Bd");
   });
 
-  /* The status is the answer; a body that fails while being discarded must not
-     turn an accepted key into "unreachable". */
   test("keeps Smarty's answer when discarding the response body fails", async () => {
     const erroringBody = new ReadableStream({
       start(controller) {

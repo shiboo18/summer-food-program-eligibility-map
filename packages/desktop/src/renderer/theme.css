@@ -29,6 +29,9 @@
   --font-size-lg: 0.96rem;
   --font-size-xl: 1.05rem;
   --font-size-2xl: 1.15rem;
+  /* Readable body text for dialogs: the 16px floor for older and non-technical readers. */
+  --font-size-body: 1rem;
+  --font-size-dialog-title: 1.375rem;
   --font-size-heading: 1.6rem;
   --font-size-title: clamp(1.7rem, 3.4vw, 2.2rem);
   --font-size-display: clamp(1.9rem, 4vw, 2.8rem);
@@ -61,7 +64,6 @@ html[data-theme="light"] {
   --text: #3d332e;
   --text-soft: #786a62;
   --text-faint: #9b8c84;
-  /* A warm orange, bright but a step softer than full saturation. */
   --accent: #eaa275;
   --accent-strong: #d07d4e;
   --accent-text: #382016;

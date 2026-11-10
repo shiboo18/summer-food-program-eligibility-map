@@ -8,7 +8,7 @@ export function isCellReference(value: string): boolean {
   return cellPattern.test(value.trim());
 }
 
-/** Resolves a header cell such as `B1` to its 1-based column number, or undefined. */
+/** Resolve a header cell such as `B1` to its 1-based column number, or undefined. */
 export function columnNumberFromCell(value: string): number | undefined {
   const match = cellPattern.exec(value.trim());
   if (match === null) {
@@ -22,13 +22,13 @@ export function columnNumberFromCell(value: string): number | undefined {
   return column;
 }
 
-/** The row of a header cell such as `B1`, or undefined when it is not a cell. */
+/** Return the row of a header cell such as `B1`, or undefined when it is not a cell. */
 export function rowNumberFromCell(value: string): number | undefined {
   const match = cellPattern.exec(value.trim());
   return match === null ? undefined : Number(match[2]);
 }
 
-/** The cell for a 1-based column in the given row, so column 2 row 1 is `B1`. */
+/** Return the cell for a 1-based column in the given row, so column 2 row 1 is `B1`. */
 export function cellAtColumn(column: number, row: number): string {
   let letters = "";
   let remaining = column;
@@ -41,9 +41,8 @@ export function cellAtColumn(column: number, row: number): string {
 }
 
 /**
- * The column name at a header cell, when the sheet is that wide and names that
- * column. A column left unnamed reads as no column at all, so a cell pointing at
- * one is treated the same as a cell past the last column.
+ * Return the column name at a header cell, if the sheet names that column. An
+ * unnamed column reads the same as a cell past the last column.
  */
 export function headerAtCell(value: string, headers: readonly string[]): string | undefined {
   const column = columnNumberFromCell(value);
