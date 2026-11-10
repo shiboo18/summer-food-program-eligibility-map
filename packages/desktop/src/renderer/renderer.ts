@@ -31,6 +31,7 @@ import {
 import { defaultPreferences } from "../../../backend/dist/types/preferences.js";
 import { getRequiredElement } from "./dom.js";
 import { systemNotifier, type Notifier } from "./notifier.js";
+import type { Tone } from "./tone.js";
 import { createBackgroundQueue } from "./workflow/background-queue.js";
 import { createSettingsPanel } from "./settings/settings-panel.js";
 import { singleFlight } from "./workflow/single-flight.js";
@@ -197,7 +198,7 @@ function renderWorkflow(): void {
     button.addEventListener("click", (): void => goToStage(step.id as Stage));
 
     const number = document.createElement("span");
-    number.className = "workflow-step-number";
+    number.className = "step-badge";
     number.textContent = String(index + 1);
 
     const label = document.createElement("span");
@@ -231,7 +232,7 @@ function wait(milliseconds: number): Promise<void> {
 }
 
 /** What the workbook status line says, and whether it is still being worked out. */
-type FileStatusState = "idle" | "checking" | "valid" | "error";
+type FileStatusState = Extract<Tone, "idle" | "pending" | "success" | "error">;
 
 /**
  * Write the workbook status line. The spinner turns while the file is being
@@ -239,8 +240,8 @@ type FileStatusState = "idle" | "checking" | "valid" | "error";
  */
 function setFileStatus(message: string, state: FileStatusState): void {
   excelFileMessage.textContent = message;
-  excelFileStatus.dataset.state = state;
-  excelFileSpinner.hidden = state !== "checking";
+  excelFileStatus.dataset.tone = state;
+  excelFileSpinner.hidden = state !== "pending";
 }
 
 function setUploadLoading(loading: boolean): void {
@@ -285,7 +286,7 @@ function renderMapping(selection: SpreadsheetSelection): void {
 
 async function openSpreadsheet(): Promise<void> {
   setUploadLoading(true);
-  setFileStatus("Checking the file opens as an Excel workbook…", "checking");
+  setFileStatus("Checking the file opens as an Excel workbook…", "pending");
 
   const selection = bridge.spreadsheet.open();
   try {
@@ -298,8 +299,8 @@ async function openSpreadsheet(): Promise<void> {
     selectedSpreadsheet = result;
     lastReport = null;
     formMessage.textContent = "";
-    formMessage.dataset.state = "idle";
-    setFileStatus("Checked — this is a readable Excel workbook.", "valid");
+    formMessage.dataset.tone = "idle";
+    setFileStatus("Checked — this is a readable Excel workbook.", "success");
     goToStage("map-columns");
   } catch (error: unknown) {
     selectedSpreadsheet = null;
@@ -336,11 +337,11 @@ function currentMapping(): ColumnMapping {
 function finishMapColumns(): void {
   if (selectedSpreadsheet === null) {
     formMessage.textContent = "Upload an Excel file first.";
-    formMessage.dataset.state = "error";
+    formMessage.dataset.tone = "error";
     return;
   }
   formMessage.textContent = "";
-  formMessage.dataset.state = "idle";
+  formMessage.dataset.tone = "idle";
 
   const chosen = currentMapping();
   const { headers, headerRowNumber } = selectedSpreadsheet;
@@ -438,8 +439,8 @@ function renderCombinedResults(validation: ValidationReport, eligibility: Eligib
   renderResultsStats([
     { value: eligibility.total, label: "Rows checked", tone: "neutral" },
     { value: deliverableCount, label: "Deliverable", tone: "good" },
-    { value: eligibility.ruralCount, label: "USDA rural", tone: "neutral" },
-    { value: eligibility.areaEligibleCount, label: "USDA eligible", tone: "neutral" },
+    { value: eligibility.ruralCount, label: "Rural designation", tone: "neutral" },
+    { value: eligibility.areaEligibleCount, label: "Area eligible", tone: "neutral" },
   ]);
 }
 
@@ -459,7 +460,7 @@ function renderResultsStats(stats: readonly ResultStat[]): void {
     value.className = "results-stat-value";
     value.textContent = String(stat.value);
     const label = document.createElement("span");
-    label.className = "results-stat-label";
+    label.className = "overline";
     label.textContent = stat.label;
     tile.append(value, label);
     resultsStats.append(tile);
@@ -524,13 +525,13 @@ bridge.run.onProgress((progress: RunProgress): void => {
 async function performChecks(): Promise<void> {
   if (selectedSpreadsheet === null) {
     checksMessage.textContent = "Upload an Excel file first.";
-    checksMessage.dataset.state = "error";
+    checksMessage.dataset.tone = "error";
     return;
   }
   const selection = currentCheckSelection();
   if (!canRunChecks(selection)) {
-    checksMessage.textContent = "Address validation is required.";
-    checksMessage.dataset.state = "error";
+    checksMessage.textContent = "The address check is required.";
+    checksMessage.dataset.tone = "error";
     return;
   }
 
@@ -548,7 +549,7 @@ async function performChecks(): Promise<void> {
 
   setRunChecksLoading(true);
   checksMessage.textContent = "";
-  checksMessage.dataset.state = "idle";
+  checksMessage.dataset.tone = "idle";
   lastChecks = selectedEligibilityChecks(selection);
   activeRunPhaseList = activeRunPhases(lastChecks);
   startRunProgress(selectedSpreadsheet.rowCount);
@@ -578,7 +579,7 @@ async function performChecks(): Promise<void> {
     processingSection.hidden = true;
     checksSection.hidden = false;
     checksMessage.textContent = friendlyMessage(error, "The checks failed.");
-    checksMessage.dataset.state = "error";
+    checksMessage.dataset.tone = "error";
   } finally {
     setUiFrozen(false);
     setRunChecksLoading(false);
@@ -627,7 +628,7 @@ function resetExportButton(): void {
   resultsExported = false;
   downloadLabel.textContent = exportButtonLabel();
   downloadMessage.textContent = "";
-  downloadMessage.dataset.state = "idle";
+  downloadMessage.dataset.tone = "idle";
 }
 
 function columnLetter(columnNumber: number): string {
@@ -651,7 +652,6 @@ function renderExportMessage(filePath: string): void {
   ];
 
   const lead = document.createElement("p");
-  lead.className = "export-message-lead";
   lead.textContent = `Saved a copy to ${filePath}. Your original file is unchanged. New columns, after your data:`;
 
   const list = document.createElement("ul");
@@ -674,18 +674,18 @@ async function exportResults(): Promise<void> {
   }
   setDownloadLoading(true);
   downloadMessage.textContent = "";
-  downloadMessage.dataset.state = "idle";
+  downloadMessage.dataset.tone = "idle";
   try {
     const result = await bridge.results.export(selectedSpreadsheet.fileName);
     if (result.canceled || result.filePath === undefined) {
       return;
     }
     resultsExported = true;
-    downloadMessage.dataset.state = "success";
+    downloadMessage.dataset.tone = "success";
     renderExportMessage(result.filePath);
   } catch (error: unknown) {
     downloadMessage.textContent = friendlyMessage(error, "Could not save the results file.");
-    downloadMessage.dataset.state = "error";
+    downloadMessage.dataset.tone = "error";
   } finally {
     setDownloadLoading(false);
   }
@@ -696,10 +696,10 @@ async function openExportedFile(): Promise<void> {
     return;
   }
   try {
-    await bridge.results.reveal(selectedSpreadsheet.fileName);
+    await bridge.results.open(selectedSpreadsheet.fileName);
   } catch (error: unknown) {
     downloadMessage.textContent = friendlyMessage(error, "Could not open the exported file.");
-    downloadMessage.dataset.state = "error";
+    downloadMessage.dataset.tone = "error";
   }
 }
 
@@ -736,7 +736,6 @@ const settingsPanel = createSettingsPanel({
     homeCredentialNotice.dataset.tone = tone;
     /* Held back until the key can run checks; the notice beside it says why. */
     homeStartButton.disabled = blocker !== undefined;
-    homeStartButton.classList.toggle("is-active", blocker === undefined);
   },
 });
 
@@ -778,13 +777,15 @@ function renderHomeSteps(): void {
     item.className = "home-step";
 
     const number = document.createElement("span");
-    number.className = "home-step-number";
+    number.className = "step-badge";
     number.textContent = String(index + 1);
 
     const title = document.createElement("h2");
+    title.className = "subhead";
     title.textContent = step.label;
 
     const summary = document.createElement("p");
+    summary.className = "copy";
     summary.textContent = step.summary;
 
     item.append(number, title, summary);

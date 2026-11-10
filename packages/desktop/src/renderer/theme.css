@@ -20,21 +20,23 @@
   --radius-md: 11px;
   --radius-sm: 8px;
 
-  /* Type scale. Every font size in styles.css is one of these. */
-  --font-size-2xs: 0.68rem;
-  --font-size-xs: 0.74rem;
+  /* Type scale. Every font size in styles.css is one of these, and none is
+     smaller than 0.8rem (12.8px). Body text is the 16px most partners read. */
   --font-size-sm: 0.8rem;
-  --font-size-md: 0.86rem;
-  --font-size-base: 0.9rem;
-  --font-size-lg: 0.96rem;
-  --font-size-xl: 1.05rem;
-  --font-size-2xl: 1.15rem;
-  /* Readable body text for dialogs: the 16px floor for older and non-technical readers. */
   --font-size-body: 1rem;
-  --font-size-dialog-title: 1.375rem;
+  --font-size-lead: 1.125rem;
+  --font-size-section: 1.375rem;
   --font-size-heading: 1.6rem;
   --font-size-title: clamp(1.7rem, 3.4vw, 2.2rem);
-  --font-size-display: clamp(1.9rem, 4vw, 2.8rem);
+
+  /* Spacing, on a 4px grid. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
 
   /* Depth, from a control lifted off the page to a dialog above everything. */
   --shadow-accent: 0 6px 15px color-mix(in srgb, var(--accent-strong) 14%, transparent);
@@ -52,6 +54,12 @@
   font-family: "Manrope", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+/* Text grows a little on large windows, 16px up to 18px, so a wide layout does
+   not leave it looking small. Every rem-based size follows. */
+html {
+  font-size: clamp(1rem, 0.333vw + 0.708rem, 1.125rem);
 }
 
 html[data-theme="light"] {

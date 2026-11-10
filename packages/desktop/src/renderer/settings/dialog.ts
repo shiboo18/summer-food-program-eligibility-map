@@ -59,7 +59,7 @@ const svgNamespace = "http://www.w3.org/2000/svg";
 function createCloseButton(label: string): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "gear-button welcome-close";
+  button.className = "gear-button dialog-close";
   button.setAttribute("aria-label", label);
   button.title = label;
 
@@ -106,7 +106,7 @@ export function createDialog(overlayId: string, trigger: HTMLButtonElement, opti
   for (const done of overlay.querySelectorAll<HTMLButtonElement>("[data-dialog-close]")) {
     done.addEventListener("click", close);
   }
-  overlay.querySelector(".welcome-card")?.prepend(closeButton);
+  overlay.querySelector(".dialog-card")?.prepend(closeButton);
 
   /* Wrapped: a click listener would otherwise pass its event as the opener. */
   trigger.addEventListener("click", (): void => open());

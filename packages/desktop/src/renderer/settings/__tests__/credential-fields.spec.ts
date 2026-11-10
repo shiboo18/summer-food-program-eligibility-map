@@ -8,6 +8,6 @@ describe("credentialFields", () => {
   });
 
   test("labels each field the way Smarty names it", () => {
-    expect(credentialFields.map((entry) => entry.label)).toEqual(["AUTH_ID", "AUTH_TOKEN"]);
+    expect(credentialFields.map((entry) => entry.label)).toEqual(["Auth ID", "Auth Token"]);
   });
 });

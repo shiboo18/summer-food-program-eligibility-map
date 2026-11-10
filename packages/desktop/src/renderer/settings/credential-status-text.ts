@@ -1,15 +1,15 @@
 import type { CredentialCheck } from "../../../../backend/dist/index.js";
+import type { Tone } from "../tone.js";
 
 /** The stored key's state on screen: Smarty's last answer, or a check under way. */
 export type CredentialDisplayState = CredentialCheck | "checking";
 
 /** How the status reads at a glance; styling keys off this. */
-export type CredentialTone = "idle" | "pending" | "success" | "warning" | "error";
 
 export interface CredentialStatusView {
   /** The status line in Settings and in the credentials dialog. */
   readonly text: string;
-  readonly tone: CredentialTone;
+  readonly tone: Tone;
   /** Why a run cannot start with the stored key; absent when it can. */
   readonly blocker?: string;
   /** What the home page says about the key, beside a link to Settings; present exactly when `blocker` is. */

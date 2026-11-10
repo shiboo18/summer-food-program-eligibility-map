@@ -60,7 +60,7 @@ contextBridge.exposeInMainWorld(
     results: Object.freeze({
       export: (fileName: string) =>
         ipcRenderer.invoke("results:export", { fileName }) as Promise<ExportResult>,
-      reveal: (fileName: string) => ipcRenderer.invoke("results:reveal", fileName) as Promise<void>,
+      open: (fileName: string) => ipcRenderer.invoke("results:open", fileName) as Promise<void>,
     }),
     run: Object.freeze({
       onProgress: (listener: (progress: RunProgress) => void) => {

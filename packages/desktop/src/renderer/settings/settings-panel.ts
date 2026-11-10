@@ -13,11 +13,12 @@ import { followingCells, parseTypedCells } from "../../../../backend/dist/core/c
 import { toCredentialInput, toSmartyCredentials } from "../../../../backend/dist/core/smarty-credentials.js";
 import { SMARTY_API_KEYS_URL } from "../../../../backend/dist/config/constants.js";
 import { friendlyMessage } from "../../shared/text.js";
-import { getRequiredElement } from "../dom.js";
+import { createField, getRequiredElement } from "../dom.js";
 import type { Notifier } from "../notifier.js";
 import { latestOnly } from "../workflow/latest-only.js";
 import { singleFlight } from "../workflow/single-flight.js";
 import { credentialFields, type SmartyCredential } from "./credential-fields.js";
+import { credentialHint } from "./credential-hints.js";
 import {
   credentialStatusView,
   type CredentialDisplayState,
@@ -87,11 +88,9 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   /* Opens in the partner's own browser, where they are already signed in. */
   getRequiredElement<HTMLAnchorElement>("#open-smarty-keys").href = SMARTY_API_KEYS_URL;
 
-  for (const { name, label } of credentialFields) {
-    const caption = document.createElement("label");
-    caption.htmlFor = `credential-${name}`;
-    caption.textContent = label;
+  const credentialHints: HTMLElement[] = [];
 
+  for (const { name, label } of credentialFields) {
     const input = document.createElement("input");
     input.id = `credential-${name}`;
     input.name = name;
@@ -99,9 +98,28 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     input.autocomplete = "off";
     input.spellcheck = false;
 
-    credentialFieldsContainer.append(caption, input);
+    const hint = document.createElement("p");
+    hint.id = `credential-${name}-hint`;
+    hint.className = "coach-mark";
+    hint.setAttribute("role", "status");
+    hint.hidden = true;
+    input.setAttribute("aria-describedby", hint.id);
+    credentialHints.push(hint);
+
+    /* Shown as the partner types for an email, and once they leave the field for a wrong shape. */
+    const coach = (settled: boolean) => (): void => {
+      const text = credentialHint(name, input.value, settled);
+      hint.textContent = text ?? "";
+      hint.hidden = text === undefined;
+    };
+
+    const field = createField(input, label);
+    field.append(hint);
+    credentialFieldsContainer.append(field);
     credentialInputs.set(name, input);
     input.addEventListener("input", updateSaveAvailability);
+    input.addEventListener("input", coach(false));
+    input.addEventListener("change", coach(true));
   }
 
   function typedCredentials(): SmartyCredentials | undefined {
@@ -112,20 +130,22 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   function updateSaveAvailability(): void {
     const ready = typedCredentials() !== undefined;
     saveCredentialsButton.disabled = !ready;
-    saveCredentialsButton.classList.toggle("is-active", ready);
   }
 
   /* The form's own reset fires no input events, so availability is redone with it. */
   function resetCredentialForm(): void {
     settingsForm.reset();
     updateSaveAvailability();
+    for (const hint of credentialHints) {
+      hint.hidden = true;
+    }
   }
 
   const credentialDialog = createDialog("#credential-overlay", openCredentialsButton, {
     closeLabel: "Close credentials",
     onOpen: (): void => {
       settingsMessage.textContent = "";
-      settingsMessage.dataset.state = "idle";
+      settingsMessage.dataset.tone = "idle";
       updateSaveAvailability();
       announceFrom(dialogStatusLine);
       credentialInputs.get(credentialFields[0]?.name ?? "smartyAuthId")?.focus();
@@ -139,7 +159,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   function reportOn(surface: HTMLElement, fallback = settingsFailure): (error: unknown) => void {
     return (error: unknown): void => {
       surface.textContent = friendlyMessage(error, fallback);
-      surface.dataset.state = "error";
+      surface.dataset.tone = "error";
     };
   }
 
@@ -171,7 +191,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
       }
     }
     const wholeKey = credentialFields.every(({ name }) => status[name]);
-    openCredentialsButton.textContent = wholeKey ? "Update Smarty credentials" : "Set Smarty credentials";
+    openCredentialsButton.textContent = wholeKey ? "Change Smarty credentials" : "Set up Smarty credentials";
     showCredentialState(wholeKey ? "checking" : "not-set");
   }
 
@@ -205,14 +225,13 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
      press is ignored rather than sending a second save. */
   const saveCredentials = singleFlight(async (credentials: SmartyCredentials): Promise<void> => {
     saveCredentialsButton.disabled = true;
-    saveCredentialsButton.classList.remove("is-active");
     try {
       const { saved, check, status } = await bridge.settings.save(toCredentialInput(credentials));
       if (!saved) {
         /* Nothing was stored, so the status still describes the key that is.
            The typed values stay in the form so a typo can be fixed. */
         settingsMessage.textContent = credentialStatusView(check).refusedSave ?? "That key wasn't saved.";
-        settingsMessage.dataset.state = "error";
+        settingsMessage.dataset.tone = "error";
         return;
       }
       resetCredentialForm();
@@ -228,7 +247,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   });
 
   getRequiredElement<HTMLButtonElement>("#clear-settings").addEventListener("click", (): void => {
-    if (!ports.notifier.confirm("Clear stored Smarty credentials?")) {
+    if (!ports.notifier.confirm("Clear the saved Smarty credentials?")) {
       return;
     }
     void bridge.settings
@@ -256,18 +275,11 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     closeLabel: "Close map columns",
     onOpen: (): void => {
       columnsMessage.textContent = "";
-      columnsMessage.dataset.state = "idle";
+      columnsMessage.dataset.tone = "idle";
     },
   });
 
   function addCellField(field: AddressField, label: string, optional: boolean): void {
-    const wrapper = document.createElement("div");
-    wrapper.className = "cell-field";
-
-    const caption = document.createElement("label");
-    caption.htmlFor = `cell-${field}`;
-    caption.textContent = optional ? `${label} (optional)` : label;
-
     const input = document.createElement("input");
     input.id = `cell-${field}`;
     input.type = "text";
@@ -277,8 +289,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     input.maxLength = cellInputMaxLength;
     input.value = ports.getPreferences().columnMapping[field] ?? "";
 
-    wrapper.append(caption, input);
-    addressCells.append(wrapper);
+    addressCells.append(createField(input, label, optional));
     cellInputs.set(field, input);
     if (!optional) {
       requiredCells.add(field);
@@ -314,7 +325,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
 
     const mapping = ports.getPreferences().columnMapping;
     const anySet = [...cellInputs.keys()].some((field) => mapping[field] !== undefined);
-    openColumnsButton.textContent = anySet ? "Change map columns" : "Set map columns";
+    openColumnsButton.textContent = anySet ? "Change map columns" : "Set up map columns";
   }
 
   columnsForm.addEventListener("submit", (event): void => {
@@ -330,7 +341,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
 
     if (!result.ok) {
       columnsMessage.textContent = result.message;
-      columnsMessage.dataset.state = "error";
+      columnsMessage.dataset.tone = "error";
       return;
     }
 

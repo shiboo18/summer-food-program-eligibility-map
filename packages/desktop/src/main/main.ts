@@ -355,14 +355,18 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
 
   /* The exported path is looked up by file name, so it never travels through the
      renderer. */
-  ipcMain.handle("results:reveal", (event, fileName: unknown): void => {
+  ipcMain.handle("results:open", async (event, fileName: unknown): Promise<void> => {
     assertTrustedSender(event);
     const summary = requireOpenedSpreadsheet(openedSpreadsheets, fileName);
     const exportedPath = exportedPaths.get(summary.fileName);
     if (exportedPath === undefined) {
       throw new Error("Export the results before opening them.");
     }
+    /* The folder first, so the file can still be found if opening it fails. */
     shell.showItemInFolder(exportedPath);
+    if ((await shell.openPath(exportedPath)) !== "") {
+      throw new Error("The results file is saved but could not be opened. It is shown in its folder.");
+    }
   });
 
   ipcMain.handle("settings:get-status", async (event): Promise<unknown> => {

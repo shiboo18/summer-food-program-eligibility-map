@@ -88,6 +88,19 @@ describe("theme tokens", () => {
     expect(undefinedTokens).toEqual([]);
   });
 
+  /* Text smaller than this is hard to read for many partners. */
+  test("no step of the type scale is smaller than 0.8rem", () => {
+    const steps = [...theme.matchAll(/(--font-size-[\w-]+)\s*:\s*([^;]+);/g)].map(
+      (match) => [match[1] ?? "", match[2] ?? ""] as const,
+    );
+    const tooSmall = steps.filter(([, value]) =>
+      [...value.matchAll(/(\d*\.?\d+)rem/g)].some((size) => Number(size[1]) < 0.8),
+    );
+
+    expect(steps.length).toBeGreaterThan(0);
+    expect(tooSmall).toEqual([]);
+  });
+
   test("the light and dark themes define the same colours", () => {
     const light = [...definedTokens(ruleBody(theme, 'html[data-theme="light"]'))].sort();
     const dark = [...definedTokens(ruleBody(theme, 'html[data-theme="dark"]'))].sort();

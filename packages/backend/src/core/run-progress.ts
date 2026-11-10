@@ -6,9 +6,9 @@ export const runPhases: readonly RunPhase[] = ["verifying", "rural", "area"];
 
 /** The partner-facing name of each phase, shown as a step in the run screen. */
 const phaseLabels: Readonly<Record<RunPhase, string>> = {
-  verifying: "Address Verification",
-  rural: "USDA Rural",
-  area: "USDA Eligibility",
+  verifying: "Address check",
+  rural: "USDA rural designation",
+  area: "USDA area eligibility",
 };
 
 /**

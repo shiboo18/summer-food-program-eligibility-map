@@ -10,6 +10,6 @@ export const checksStep: WorkflowStep = {
   description: (context) =>
     context.fileName === null
       ? "Upload and map a file to choose checks."
-      : "Address validation always runs. Add USDA checks if you need them.",
+      : "The address check always runs. Add USDA checks if you need them.",
   isAvailable: (context) => context.fileName !== null,
 };

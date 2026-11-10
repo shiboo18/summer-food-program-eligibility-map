@@ -15,6 +15,6 @@ export interface CredentialFieldDescriptor {
  * never read back, so these are always password inputs.
  */
 export const credentialFields: readonly CredentialFieldDescriptor[] = [
-  { name: "smartyAuthId", label: "AUTH_ID" },
-  { name: "smartyAuthToken", label: "AUTH_TOKEN" },
+  { name: "smartyAuthId", label: "Auth ID" },
+  { name: "smartyAuthToken", label: "Auth Token" },
 ];

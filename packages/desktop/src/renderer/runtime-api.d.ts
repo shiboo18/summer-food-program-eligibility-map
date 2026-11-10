@@ -50,8 +50,8 @@ declare global {
       };
       readonly results: {
         export(fileName: string): Promise<ExportResult>;
-        /** Reveal the exported copy in the OS file manager. */
-        reveal(fileName: string): Promise<void>;
+        /** Show the exported copy in the OS file manager, then open it in its default app. */
+        open(fileName: string): Promise<void>;
       };
       readonly run: {
         /** Subscribe to a run's progress. Returns the unsubscribe function. */
