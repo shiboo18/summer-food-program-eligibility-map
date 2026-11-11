@@ -7,7 +7,7 @@ import type { ProgressReporter } from "../../types/progress.js";
  * rows: locating, then each selected USDA check. Each pass counts from zero, so
  * each reporter maps its count into its own slice and the phase fills once.
  *
- * @param passCount How many passes share the phase. Below one is treated as one.
+ * @param passCount How many passes share the phase, at least one.
  * @param total Rows the phase has to get through.
  * @param report Where to send the combined count.
  */
@@ -16,11 +16,10 @@ export function createPassReporters(
   total: number,
   report: ProgressReporter,
 ): readonly ProgressReporter[] {
-  const passes = Math.max(passCount, 1);
-  return Array.from({ length: passes }, (_unused, pass): ProgressReporter => {
+  return Array.from({ length: passCount }, (_unused, pass): ProgressReporter => {
     return (completed: number): void => {
       const throughPass = total <= 0 ? 1 : Math.min(Math.max(completed / total, 0), 1);
-      report(Math.round(((pass + throughPass) / passes) * total));
+      report(Math.round(((pass + throughPass) / passCount) * total));
     };
   });
 }

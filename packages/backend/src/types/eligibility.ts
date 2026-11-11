@@ -23,7 +23,6 @@ export interface GeocodeResult {
   /** Match score 0–100: how well the address matched, not how precisely it is placed. */
   readonly score: number;
   readonly precision: LocationPrecision;
-  readonly matchedAddress: string;
 }
 
 /**
@@ -44,8 +43,6 @@ export type RuralDesignation = "rural" | "not-rural";
 
 export interface RuralResult {
   readonly designation: RuralDesignation;
-  /** Human-readable rural criteria (layer names) that matched, if any. */
-  readonly matchedCriteria: readonly string[];
 }
 
 /**
@@ -60,15 +57,7 @@ export type AreaEligibility = "eligible" | "averaged-eligible" | "not-eligible" 
 
 export interface AreaEligibilityResult {
   readonly eligibility: AreaEligibility;
-  readonly geoid?: string;
-  readonly county?: string;
-  readonly blockGroupPct?: number;
-  readonly tractPct?: number;
-  readonly averagedPct?: number;
 }
-
-/** Confidence in a row's location, derived from the geocode score. */
-export type LocationConfidence = "high" | "low" | "none";
 
 /**
  * A row whose coordinate has been resolved, so it is ready to be checked. The
@@ -81,44 +70,24 @@ export interface LocatedRow {
   readonly geocode: GeocodeResult;
 }
 
-/**
- * The result of checking one row: either the value, or why that row failed.
- *
- * A batch of thousands of rows has to finish, so one row's failure is returned
- * as a value rather than thrown, and the compiler makes the report handle both
- * arms. The batch wrapper turns a single-point throw into the `ok: false` arm.
- */
-export type CheckOutcome<Value> =
-  | { readonly ok: true; readonly value: Value }
-  | { readonly ok: false; readonly reason: string };
-
 /** Which USDA checks the user selected to run. */
 export interface EligibilityChecks {
   readonly rural: boolean;
   readonly area: boolean;
 }
 
-/** Per-row outcome of the eligibility pipeline. */
+/** Per-row outcome of the eligibility pipeline. A check that did not run or failed leaves its value absent. */
 export interface EligibilityRowResult {
   readonly rowNumber: number;
-  readonly matchedAddress?: string;
-  readonly score?: number;
   /** How precisely the row was placed; absent when it could not be located. */
   readonly precision?: LocationPrecision;
-  readonly confidence: LocationConfidence;
-  /** True when the location is too approximate to trust the USDA verdicts. */
-  readonly needsVerification: boolean;
   readonly rural?: RuralResult;
   readonly area?: AreaEligibilityResult;
-  readonly messages: readonly string[];
 }
 
 /** Summary of an eligibility run over a spreadsheet's mapped rows. */
 export interface EligibilityReport {
-  readonly fileName: string;
   readonly total: number;
-  readonly located: number;
-  readonly needingVerification: number;
   readonly ruralCount: number;
   readonly areaEligibleCount: number;
   readonly rows: readonly EligibilityRowResult[];

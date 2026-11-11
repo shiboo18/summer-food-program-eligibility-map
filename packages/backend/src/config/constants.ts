@@ -55,19 +55,6 @@ export const USDA_RURAL_SERVICE_URL =
 export const USDA_RURAL_LAYER_IDS: readonly number[] = [0, 1, 2, 3, 4];
 
 /**
- * Human-readable label for each rural-criteria layer, keyed by layer id. Source
- * layer names: MSA_notpartofaCensusUrbanArea, CountiesNotPartofMSA,
- * Counties_UIC, Counties_RUCC, CensusTractsSummerMeals.
- */
-export const USDA_RURAL_CRITERIA: Readonly<Record<number, string>> = {
-  0: "MSA — not part of a Census urban area",
-  1: "County not part of an MSA",
-  2: "County Urban Influence Code",
-  3: "County Rural-Urban Continuum Code",
-  4: "Census tract rural designation",
-};
-
-/**
  * No Kid Hungry SFSP area-eligibility layer (census block groups, FY26).
  * The rules this layer encodes: https://www.fna.usda.gov/cn/area-eligibility
  */
@@ -84,15 +71,6 @@ export const AREA_ELIGIBILITY_LAYER_URL =
  * that entry is a different hosted layer that publishes `ELIGFY26` alone.
  */
 export const AREA_ELIGIBILITY_FIELD = `FY${String(USDA_DATASET_YEAR % 100).padStart(2, "0")}_Eligibility`;
-
-/** Supporting evidence fields returned alongside the eligibility verdict. */
-export const AREA_EVIDENCE_FIELDS = {
-  geoid: "GEOID",
-  county: "County",
-  blockGroupPct: "BGPct18",
-  tractPct: "TractPct18",
-  averagedPct: "PctPovBG_all",
-} as const;
 
 /** Raw `FY26_Eligibility` values as they appear in the source layer. */
 export const AREA_ELIGIBILITY_VALUES = {

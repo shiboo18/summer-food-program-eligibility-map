@@ -1,6 +1,6 @@
 import { describe, expect, test, vi } from "vitest";
 
-import { createBackgroundQueue } from "../background-queue.js";
+import { createBackgroundQueue, type BackgroundQueue } from "../background-queue.js";
 
 /** A promise the test settles itself, so overlapping work is observable. */
 function deferred(): { promise: Promise<void>; resolve: () => void } {
@@ -9,6 +9,13 @@ function deferred(): { promise: Promise<void>; resolve: () => void } {
     resolve = settle;
   });
   return { promise, resolve };
+}
+
+/** Resolve once everything queued so far has run, by queueing a marker behind it. */
+function settled(queue: BackgroundQueue): Promise<void> {
+  const done = deferred();
+  queue.enqueue(async () => done.resolve());
+  return done.promise;
 }
 
 describe("createBackgroundQueue", () => {
@@ -39,7 +46,7 @@ describe("createBackgroundQueue", () => {
       order.push("second started");
     });
     first.resolve();
-    await queue.drain();
+    await settled(queue);
 
     expect(order).toEqual(["first started", "first finished", "second started"]);
   });
@@ -55,7 +62,7 @@ describe("createBackgroundQueue", () => {
     queue.enqueue(async () => {
       seen = { ...stored };
     });
-    await queue.drain();
+    await settled(queue);
 
     expect(seen).toEqual({ kept: 1, added: 2 });
   });
@@ -72,13 +79,13 @@ describe("createBackgroundQueue", () => {
     queue.enqueue(async () => {
       ranAfter = true;
     });
-    await queue.drain();
+    await settled(queue);
 
     expect(onError).toHaveBeenCalledWith(failure);
     expect(ranAfter).toBe(true);
   });
 
-  test("waits only for the work queued before the wait, not for work queued during it", async () => {
+  test("runs work queued from inside a piece after the work already queued", async () => {
     const order: string[] = [];
     const queue = createBackgroundQueue(() => {});
 
@@ -91,14 +98,10 @@ describe("createBackgroundQueue", () => {
     queue.enqueue(async () => {
       order.push("second");
     });
-    await queue.drain();
+    await settled(queue);
 
     expect(order).toEqual(["first", "second"]);
-    await queue.drain();
+    await settled(queue);
     expect(order).toEqual(["first", "second", "queued from the first"]);
-  });
-
-  test("finishes at once when nothing is queued", async () => {
-    await expect(createBackgroundQueue(() => {}).drain()).resolves.toBeUndefined();
   });
 });

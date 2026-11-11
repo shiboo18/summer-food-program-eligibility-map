@@ -2,8 +2,6 @@
 export interface BackgroundQueue {
   /** Queue work behind everything already queued. Returns immediately. */
   enqueue(work: () => Promise<void>): void;
-  /** Resolve once the work queued before this call has finished. */
-  drain(): Promise<void>;
 }
 
 /**
@@ -26,7 +24,5 @@ export function createBackgroundQueue(onError: (error: unknown) => void): Backgr
         }
       });
     },
-    /* The tail as it stands when asked, so work queued later is not waited on. */
-    drain: (): Promise<void> => tail,
   };
 }

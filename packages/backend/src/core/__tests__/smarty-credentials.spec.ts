@@ -5,7 +5,6 @@ import type { CredentialVerification, SmartyCredentials } from "../../types/cred
 import {
   checkStoredCredentials,
   saveAcceptedCredentials,
-  toCredentialInput,
   toSmartyCredentials,
 } from "../smarty-credentials.js";
 
@@ -33,20 +32,6 @@ describe("toSmartyCredentials", () => {
     const credentials = toSmartyCredentials(input);
 
     expect(credentials).toBeUndefined();
-  });
-});
-
-describe("toCredentialInput", () => {
-  test("names each half the way the store and the form do", () => {
-    const input = toCredentialInput({ authId: "id", authToken: "token" });
-
-    expect(input).toEqual({ smartyAuthId: "id", smartyAuthToken: "token" });
-  });
-
-  test("round-trips through toSmartyCredentials unchanged", () => {
-    const roundTripped = toSmartyCredentials(toCredentialInput(key));
-
-    expect(roundTripped).toEqual(key);
   });
 });
 

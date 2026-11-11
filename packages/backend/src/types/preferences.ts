@@ -1,3 +1,5 @@
+import type { EligibilityChecks } from "./eligibility.js";
+
 export const themeModes = ["system", "light", "dark"] as const;
 export type ThemeMode = (typeof themeModes)[number];
 
@@ -17,12 +19,6 @@ export const mappingFields = [
  */
 export type CachedColumnMapping = Readonly<Partial<Record<(typeof mappingFields)[number], string>>>;
 
-/** The optional USDA checks the user last ran. Address validation always runs, so it is not cached. */
-export interface CachedCheckSelection {
-  readonly rural: boolean;
-  readonly area: boolean;
-}
-
 /** How the app is drawn and how much it moves. */
 export interface AppAccessibilitySettings {
   readonly theme: ThemeMode;
@@ -30,13 +26,14 @@ export interface AppAccessibilitySettings {
   readonly reduceMotion: boolean;
 }
 
-export interface AppPreferences {
+export interface Preferences {
   readonly accessibility: AppAccessibilitySettings;
   readonly columnMapping: CachedColumnMapping;
-  readonly checkSelection: CachedCheckSelection;
+  /** The USDA checks the user last ran. The address check always runs, so it is not cached. */
+  readonly checkSelection: EligibilityChecks;
 }
 
-export const defaultPreferences: AppPreferences = {
+export const defaultPreferences: Preferences = {
   accessibility: { theme: "system", highContrast: false, reduceMotion: false },
   columnMapping: {},
   checkSelection: { rural: false, area: false },
