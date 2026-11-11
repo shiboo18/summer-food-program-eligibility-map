@@ -1,4 +1,5 @@
 import type { EligibilityChecks } from "../types/eligibility.js";
+import type { ResultColumns } from "../types/spreadsheet.js";
 
 /** The state of the checkboxes on the Checks step. */
 export interface EligibilityCheckSelection {
@@ -33,4 +34,15 @@ export function selectedEligibilityChecks(selection: EligibilityCheckSelection):
 /** Return whether a run can start. It needs address validation; the USDA checks are optional. */
 export function canRunChecks(selection: EligibilityCheckSelection): boolean {
   return selection.addressValidation;
+}
+
+/** Return the headers an export appends, in order: the address columns, then one per USDA check that ran. */
+export function resultColumnsFor(columns: ResultColumns, checks: EligibilityChecks): readonly string[] {
+  return [
+    columns.standardized,
+    columns.deliverability,
+    columns.location,
+    ...(checks.rural ? [columns.rural] : []),
+    ...(checks.area ? [columns.area] : []),
+  ];
 }

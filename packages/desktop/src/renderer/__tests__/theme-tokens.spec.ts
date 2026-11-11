@@ -80,6 +80,12 @@ describe("theme tokens", () => {
     expect(radii).toEqual([]);
   });
 
+  /* The shell and the dialog card set the only widths, so text, panels and tiles
+     on one page share one right edge. */
+  test("no component caps its own width", () => {
+    expect(valuesOf(styles, ["max-width"])).toEqual([]);
+  });
+
   test("every token styles.css uses is defined", () => {
     const defined = new Set([...definedTokens(theme), ...definedTokens(styles)]);
 

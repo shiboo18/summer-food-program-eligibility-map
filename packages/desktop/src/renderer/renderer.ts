@@ -8,6 +8,7 @@ import type {
 } from "../../../backend/dist/index.js";
 /* Leaf imports of logic and constants only: the backend's barrel would pull its
    Node-only dependencies into the browser context. */
+import { RESULT_COLUMNS } from "../../../backend/dist/config/constants.js";
 import { resolveAppearance } from "../../../backend/dist/core/appearance.js";
 import {
   addressFields,
@@ -19,6 +20,7 @@ import {
 import {
   canRunChecks,
   resolveCheckControls,
+  resultColumnsFor,
   selectedEligibilityChecks,
   type EligibilityCheckSelection,
 } from "../../../backend/dist/core/eligibility-checks.js";
@@ -35,7 +37,9 @@ import type { Tone } from "./tone.js";
 import { createBackgroundQueue } from "./workflow/background-queue.js";
 import { createSettingsPanel } from "./settings/settings-panel.js";
 import { singleFlight } from "./workflow/single-flight.js";
+import { resultsLocation } from "./workflow/steps/checks-step.js";
 import { workflowSteps } from "./workflow/steps/index.js";
+import { headerRowHint } from "./workflow/steps/map-columns-step.js";
 import type { WorkflowContext } from "./workflow/workflow-step.js";
 import { formatRuntimeSummary } from "../shared/runtime-info.js";
 import { friendlyMessage, splitAroundFileName } from "../shared/text.js";
@@ -115,6 +119,8 @@ const runChecksButton = getRequiredElement<HTMLButtonElement>("#run-checks");
 const runChecksSpinner = getRequiredElement<HTMLElement>("#run-checks-spinner");
 const runChecksLabel = getRequiredElement<HTMLElement>("#run-checks-label");
 const checksMessage = getRequiredElement<HTMLElement>("#checks-message");
+const checksResultsLocation = getRequiredElement<HTMLElement>("#checks-results-location");
+const mappingHint = getRequiredElement<HTMLElement>("#mapping-hint");
 
 const mappingSelects = Object.fromEntries(
   addressFields.map(({ field }) => [field, getRequiredElement<HTMLSelectElement>(`#map-${field}`)]),
@@ -278,6 +284,7 @@ function fillMappingSelect(
 /** Fill the selects from the saved cells, guessing only where nothing is saved. */
 function renderMapping(selection: SpreadsheetSelection): void {
   const headers = selection.headers;
+  mappingHint.textContent = headerRowHint(selection.headerRowNumber);
   for (const { field, optional, candidates } of addressFields) {
     const preferred = preferredHeader(preferences.columnMapping[field], headers, candidates);
     fillMappingSelect(mappingSelects[field], headers, optional, preferred);
@@ -398,6 +405,9 @@ function syncCheckControls(): void {
     checkInputs.area.checked = false;
   }
   setRunChecksEnabled(canRunChecks(currentCheckSelection()));
+  checksResultsLocation.textContent = resultsLocation(
+    resultColumnsFor(RESULT_COLUMNS, selectedEligibilityChecks(currentCheckSelection())),
+  );
 }
 
 function setRunChecksEnabled(enabled: boolean): void {
@@ -643,13 +653,7 @@ function columnLetter(columnNumber: number): string {
 
 function renderExportMessage(filePath: string): void {
   const originalCount = selectedSpreadsheet?.headers.length ?? 0;
-  const added: readonly { readonly label: string; readonly note?: string }[] = [
-    { label: "Standardized Address", note: "corrected rows only" },
-    { label: "Address Checks" },
-    { label: "Address Match Level" },
-    ...(lastChecks?.rural === true ? [{ label: "USDA Rural" }] : []),
-    ...(lastChecks?.area === true ? [{ label: "USDA Eligibility" }] : []),
-  ];
+  const added = resultColumnsFor(RESULT_COLUMNS, lastChecks ?? { rural: false, area: false });
 
   const lead = document.createElement("p");
   lead.textContent = `Saved a copy to ${filePath}. Your original file is unchanged. New columns, after your data:`;
@@ -660,7 +664,7 @@ function renderExportMessage(filePath: string): void {
     const item = document.createElement("li");
     const identifier = document.createElement("strong");
     identifier.textContent = `Column ${columnLetter(originalCount + index + 1)}`;
-    const detail = column.note === undefined ? ` — ${column.label}` : ` — ${column.label} (${column.note})`;
+    const detail = column === RESULT_COLUMNS.standardized ? ` — ${column} (corrected rows only)` : ` — ${column}`;
     item.append(identifier, document.createTextNode(detail));
     list.append(item);
   });

@@ -62,14 +62,14 @@
           <a id="home-credential-notice-link" class="text-link" href="#" role="button">Open settings</a>
         </p>
 
-        <details class="privacy-note">
+        <details class="disclosure">
           <summary class="subhead">🔒 Privacy note</summary>
           <p class="copy">
             Your data stays on your computer. Only the address fields are sent out — never names, phone numbers, or
             anything else in your spreadsheet.
           </p>
           <p class="copy">Each address is sent only to the providers that check it:</p>
-          <ul class="privacy-providers copy">
+          <ul class="disclosure-list copy">
             <li><strong>Smarty</strong> — verifies and standardizes each address.</li>
             <li><strong>ArcGIS</strong> — finds the map location an address sits at.</li>
             <li><strong>USDA</strong> — the rural and area-eligibility maps.</li>
@@ -112,6 +112,8 @@
 
           <section id="mapping-section" class="panel" aria-labelledby="intro-title" hidden>
             <form id="mapping-form" class="mapping-form" novalidate>
+              <!-- Says which row the names came from, so nobody wonders whether to skip it. -->
+              <p id="mapping-hint" class="copy"></p>
               <div class="field">
                 <label class="field-label" for="map-line1">Street address</label>
                 <select id="map-line1" name="line1" class="select"></select>
@@ -155,20 +157,35 @@
                 <input id="check-rural" type="checkbox" />
                 <span
                   ><strong>USDA rural designation</strong>
-                  <small>Checks whether the address falls in a USDA-designated rural area. Checked online against USDA data.</small></span
+                  <small>Turn on if you serve, or plan to serve, summer meals to go or by delivery.</small></span
                 >
               </label>
               <label class="check-row">
                 <input id="check-area" type="checkbox" />
                 <span
                   ><strong>USDA area eligibility</strong>
-                  <small
-                    >Checks area eligibility by census geography (in zone / with approval / out of zone). Checked
-                    online against USDA data.</small
-                  ></span
+                  <small>Turn on to see which addresses are in an area that qualifies for open summer meal sites.</small></span
                 >
               </label>
             </div>
+            <details class="disclosure">
+              <summary class="subhead">Which USDA checks do I need?</summary>
+              <ul class="disclosure-list copy">
+                <li>
+                  <strong>USDA rural designation</strong> — whether each address is rural on USDA's summer meals map.
+                  In rural areas with no on-site meal service, summer meals can be served to go or by delivery. Results
+                  read Rural or Not Rural.
+                </li>
+                <li>
+                  <strong>USDA area eligibility</strong> — whether each address is in an area where at least half the
+                  children qualify for free or reduced-price meals, which open summer meal sites need. Results read In
+                  Area — Eligible, In Area — Averaged (eligible only with State agency and USDA approval), or Not
+                  Eligible.
+                </li>
+              </ul>
+              <p class="copy">Not sure? Turn both on. Each adds one column to your results.</p>
+            </details>
+            <p id="checks-results-location" class="copy"></p>
             <p id="checks-message" class="message" data-tone="idle" aria-live="polite"></p>
             <div class="actions">
               <button id="run-checks" class="primary-button" type="button">
@@ -319,8 +336,12 @@
         <form id="column-settings-form" class="dialog-body">
           <h3 id="columns-dialog-title" class="section-title dialog-title">Map columns</h3>
           <p class="copy">
-            Type the cell that holds each column's header, such as A1. vibeCheck reads whatever header sits at that
-            cell, so a saved setup keeps working when column names change between files.
+            Type the cell that holds each column's header, such as E1, not the first address under it (E2). vibeCheck
+            finds the header row itself and reads addresses from the rows below it.
+          </p>
+          <p class="copy">
+            A saved setup keeps working when column names change between files, because vibeCheck reads whatever header
+            sits at that cell.
           </p>
           <h4 class="subhead">Address</h4>
           <div id="default-columns" class="cell-grid"></div>
@@ -349,14 +370,15 @@
             <label class="check-row">
               <input id="pref-rural" type="checkbox" />
               <span
-                ><strong>USDA rural designation</strong><small>Check whether each address is in a rural area.</small></span
+                ><strong>USDA rural designation</strong
+                ><small>Turn on if you serve, or plan to serve, summer meals to go or by delivery.</small></span
               >
             </label>
             <label class="check-row">
               <input id="pref-area" type="checkbox" />
               <span
                 ><strong>USDA area eligibility</strong
-                ><small>Check each address against USDA area eligibility.</small></span
+                ><small>Turn on to see which addresses are in an area that qualifies for open summer meal sites.</small></span
               >
             </label>
           </div>

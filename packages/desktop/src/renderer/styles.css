@@ -73,9 +73,7 @@ ul {
   line-height: 1.4;
 }
 
-/* Capped near 72 characters a line, so wide windows keep text easy to read. */
 .copy {
-  max-width: 72ch;
   color: var(--text-soft);
   font-size: var(--font-size-body);
   line-height: 1.5;
@@ -111,9 +109,11 @@ ul {
   animation: gentle-fade var(--motion-fade);
 }
 
-/* Fields: a label over its control, both body-sized. */
+/* Fields: a label over its control, both body-sized. Fields sharing a row line
+   their controls up even when one label wraps. */
 .field {
   display: grid;
+  align-content: space-between;
   gap: var(--space-2);
 }
 
@@ -331,7 +331,6 @@ ul {
 }
 
 .check-row small {
-  max-width: 72ch;
   margin-top: 2px;
   color: var(--text-soft);
   font-weight: 400;
@@ -340,6 +339,44 @@ ul {
 .check-list {
   display: grid;
   gap: var(--space-4);
+}
+
+/* A disclosure: a one-line summary that opens to the detail, such as the privacy
+   note or the USDA check help. */
+.disclosure {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+}
+
+.disclosure summary {
+  cursor: pointer;
+}
+
+.disclosure[open] summary {
+  margin-bottom: var(--space-2);
+}
+
+.disclosure[open] > :not(summary) {
+  animation: gentle-fade var(--motion-reveal);
+}
+
+.disclosure p + p,
+.disclosure p + ul,
+.disclosure ul + p {
+  margin-top: var(--space-2);
+}
+
+.disclosure-list {
+  display: grid;
+  gap: var(--space-1);
+  padding-left: 18px;
+}
+
+.disclosure-list strong {
+  color: var(--text);
 }
 
 /* A numbered circle for a step, on the home page and in the steps list. */
@@ -368,8 +405,9 @@ ul {
 
 /* Shell. A column at least as tall as the window, so the header and footer are
    the first and last rows of every view and only the middle grows. */
-/* The shell fills the window less a margin that grows with it, up to a width
-   past which lines would get too long to read comfortably. */
+/* The shell fills the window less a margin that grows with it, up to
+   --shell-max. It sets the page's only width: text, panels and tiles fill
+   their container, so they share one right edge. */
 .app-shell {
   --shell-max: 1440px;
   --shell-gutter: clamp(14px, 5vw, 80px);
@@ -527,41 +565,6 @@ ul {
   margin-bottom: 2px;
 }
 
-.privacy-note {
-  padding: var(--space-3) var(--space-4);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent-strong);
-  border-radius: var(--radius-md);
-  background: var(--surface-soft);
-}
-
-.privacy-note summary {
-  cursor: pointer;
-}
-
-.privacy-note[open] summary {
-  margin-bottom: var(--space-2);
-}
-
-.privacy-note[open] > :not(summary) {
-  animation: gentle-fade var(--motion-reveal);
-}
-
-.privacy-note p + p,
-.privacy-note p + ul {
-  margin-top: var(--space-2);
-}
-
-.privacy-providers {
-  display: grid;
-  gap: var(--space-1);
-  padding-left: 18px;
-}
-
-.privacy-providers strong {
-  color: var(--text);
-}
-
 .home-steps {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(max(200px, calc(50% - 6px)), 1fr));
@@ -672,7 +675,6 @@ ul {
 .intro {
   display: grid;
   gap: var(--space-3);
-  max-width: 700px;
   padding: 0 2px;
 }
 
@@ -705,6 +707,7 @@ ul {
   gap: var(--space-4);
 }
 
+.mapping-form > .copy,
 .mapping-form > .message,
 .mapping-form > .actions {
   grid-column: 1 / -1;
@@ -1029,7 +1032,7 @@ ul {
 @media (prefers-reduced-motion: reduce) {
   .panel,
   .dialog-overlay,
-  .privacy-note[open] > :not(summary) {
+  .disclosure[open] > :not(summary) {
     animation: none;
   }
 }

@@ -13,3 +13,8 @@ export const mapColumnsStep: WorkflowStep = {
       : `Match each address field to a column in ${context.fileName}.`,
   isAvailable: (context) => context.fileName !== null,
 };
+
+/** Say which row the column names came from, and that addresses start below it. */
+export function headerRowHint(headerRowNumber: number): string {
+  return `These are the headers vibeCheck found in row ${headerRowNumber}. Addresses are read from row ${headerRowNumber + 1} down.`;
+}

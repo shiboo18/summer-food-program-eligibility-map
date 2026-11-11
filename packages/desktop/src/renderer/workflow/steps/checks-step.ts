@@ -13,3 +13,12 @@ export const checksStep: WorkflowStep = {
       : "The address check always runs. Add USDA checks if you need them.",
   isAvailable: (context) => context.fileName !== null,
 };
+
+/**
+ * Say where an export puts the results, naming the columns it appends in the
+ * order it writes them.
+ */
+export function resultsLocation(headers: readonly string[]): string {
+  const names = new Intl.ListFormat("en", { type: "conjunction" }).format(headers);
+  return `Results go in a copy of your file, as new columns after your last column: ${names}. Your original file isn't changed.`;
+}

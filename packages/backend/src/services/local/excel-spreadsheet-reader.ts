@@ -5,6 +5,7 @@ import ExcelJS from "exceljs";
 
 import { HEADER_ROW_SCAN_LIMIT } from "../../config/constants.js";
 import { parseAddress } from "../../core/address-shape.js";
+import { resultColumnsFor } from "../../core/eligibility-checks.js";
 import { findHeaderRow, isDataRow, type HeaderRow } from "../../core/sheet-shape.js";
 import type { SpreadsheetReader, SpreadsheetWriter } from "../../contracts.js";
 import type {
@@ -73,13 +74,7 @@ export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWri
   ): Promise<void> {
     const sheet = await loadFirstSheet(filePath);
     const { columns } = options;
-    const wanted = [
-      columns.standardized,
-      columns.deliverability,
-      columns.location,
-      ...(options.includeRural ? [columns.rural] : []),
-      ...(options.includeArea ? [columns.area] : []),
-    ];
+    const wanted = resultColumnsFor(columns, { rural: options.includeRural, area: options.includeArea });
 
     const { rowNumber: headerRowNumber, headers } = requireHeaderRow(sheet);
     const columnAt = new Map<string, number>();
