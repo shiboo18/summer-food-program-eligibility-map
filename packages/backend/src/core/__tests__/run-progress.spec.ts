@@ -74,20 +74,20 @@ describe("runPhaseSteps", () => {
 
 describe("runPhaseCopy", () => {
   test("names Smarty while verifying", () => {
-    expect(runPhaseCopy("verifying")).toEqual({
+    expect(runPhaseCopy.verifying).toEqual({
       detail: "Checking each address against USPS records with Smarty",
       privacy: "Only addresses are sent to Smarty — nothing else leaves this computer",
     });
   });
 
   test("names the public maps for each USDA phase", () => {
-    expect(runPhaseCopy("rural").detail).toBe("Looking up each address on the public USDA rural map");
-    expect(runPhaseCopy("area").detail).toBe("Looking up each address on the public USDA area-eligibility map");
-    expect(runPhaseCopy("rural").privacy).toContain("USDA and ArcGIS");
+    expect(runPhaseCopy.rural.detail).toBe("Looking up each address on the public USDA rural map");
+    expect(runPhaseCopy.area.detail).toBe("Looking up each address on the public USDA area-eligibility map");
+    expect(runPhaseCopy.rural.privacy).toContain("USDA and ArcGIS");
   });
 
   test("covers every phase, so none can leave the screen blank", () => {
-    expect(runPhases.map((phase) => runPhaseCopy(phase).detail)).toEqual([
+    expect(runPhases.map((phase) => runPhaseCopy[phase].detail)).toEqual([
       "Checking each address against USPS records with Smarty",
       "Looking up each address on the public USDA rural map",
       "Looking up each address on the public USDA area-eligibility map",

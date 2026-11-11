@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 
 import {
+  columnLetters,
   cellAtColumn,
   columnNumberFromCell,
   headerAtCell,
@@ -91,5 +92,16 @@ describe("headerAtCell", () => {  test("finds the column name at a header cell",
   test("reads the column letters only, so the row typed makes no difference", () => {
     expect(headerAtCell("C2", headers)).toBe("City");
     expect(headerAtCell("C7", headers)).toBe("City");
+  });
+});
+
+describe("columnLetters", () => {
+  test.each([
+    { column: 1, letters: "A" },
+    { column: 26, letters: "Z" },
+    { column: 27, letters: "AA" },
+    { column: 703, letters: "AAA" },
+  ])("when the column is $column, names it $letters", ({ column, letters }) => {
+    expect(columnLetters(column)).toBe(letters);
   });
 });

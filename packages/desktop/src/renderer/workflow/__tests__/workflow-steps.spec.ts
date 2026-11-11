@@ -6,22 +6,11 @@ import { headerRowHint } from "../steps/map-columns-step.js";
 import { uploadStep } from "../steps/upload-step.js";
 import type { WorkflowContext } from "../workflow-step.js";
 
-const empty: WorkflowContext = { fileName: null, rowCount: 0, columnCount: 0, report: null };
-const uploaded: WorkflowContext = {
-  fileName: "addresses.xlsx",
-  rowCount: 12,
-  columnCount: 5,
-  report: null,
-};
+const empty: WorkflowContext = { fileName: null, report: null };
+const uploaded: WorkflowContext = { fileName: "addresses.xlsx", report: null };
 const validated: WorkflowContext = {
   ...uploaded,
-  report: {
-    fileName: "addresses.xlsx",
-    total: 12,
-    verified: 10,
-    corrected: 1,
-    failures: [],
-  },
+  report: { verified: 10, corrected: 1, failed: 0 },
 };
 
 describe("workflowSteps", () => {

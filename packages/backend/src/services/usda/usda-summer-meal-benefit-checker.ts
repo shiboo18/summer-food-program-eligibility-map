@@ -1,23 +1,8 @@
 import type { HttpGetClient, SummerMealBenefitChecker } from "../../contracts.js";
-import type {
-  AreaEligibility,
-  AreaEligibilityResult,
-  CheckOutcome,
-  GeoPoint,
-  LocatedRow,
-} from "../../types/eligibility.js";
+import type { AreaEligibility, AreaEligibilityResult, GeoPoint, LocatedRow } from "../../types/eligibility.js";
 import type { ProgressReporter } from "../../types/progress.js";
-import {
-  AREA_ELIGIBILITY_FIELD,
-  AREA_ELIGIBILITY_VALUES,
-  AREA_EVIDENCE_FIELDS,
-  USDA_CHECK_CONCURRENCY,
-} from "../../config/constants.js";
-import { mapWithConcurrency } from "../../core/run/concurrency.js";
-import { coordinateKey } from "../../core/run/geocode-quality.js";
-
-const evidenceFieldNames = Object.values(AREA_EVIDENCE_FIELDS);
-const outFields = [AREA_ELIGIBILITY_FIELD, ...evidenceFieldNames].join(",");
+import { AREA_ELIGIBILITY_FIELD, AREA_ELIGIBILITY_VALUES } from "../../config/constants.js";
+import { checkByCoordinate } from "../../core/run/concurrency.js";
 
 /**
  * Determines the 3-state USDA area eligibility for each point by intersecting it
@@ -31,27 +16,8 @@ export class UsdaSummerMealBenefitChecker implements SummerMealBenefitChecker {
   public async checkBenefitBatch(
     rows: readonly LocatedRow[],
     onProgress?: ProgressReporter,
-  ): Promise<ReadonlyMap<number, CheckOutcome<AreaEligibilityResult>>> {
-    /* Rows at the same coordinate share one in-flight lookup and its outcome,
-       failures included. Scoped to this call, so nothing outlives the run. */
-    const byCoordinate = new Map<string, Promise<AreaEligibilityResult>>();
-    const outcomes = await mapWithConcurrency(
-      rows,
-      USDA_CHECK_CONCURRENCY,
-      async (row) => {
-        const key = coordinateKey(row.geocode.point);
-        let pending = byCoordinate.get(key);
-        if (pending === undefined) {
-          pending = this.areaEligibilityAt(row.geocode.point);
-          byCoordinate.set(key, pending);
-        }
-        return pending;
-      },
-      onProgress,
-    );
-    return new Map(
-      rows.map((row, index) => [row.rowNumber, outcomes[index] as CheckOutcome<AreaEligibilityResult>]),
-    );
+  ): Promise<ReadonlyMap<number, AreaEligibilityResult | undefined>> {
+    return checkByCoordinate(rows, (point) => this.areaEligibilityAt(point), onProgress);
   }
 
   private async areaEligibilityAt(point: GeoPoint): Promise<AreaEligibilityResult> {
@@ -62,7 +28,7 @@ export class UsdaSummerMealBenefitChecker implements SummerMealBenefitChecker {
         geometryType: "esriGeometryPoint",
         inSR: "4326",
         spatialRel: "esriSpatialRelIntersects",
-        outFields,
+        outFields: AREA_ELIGIBILITY_FIELD,
         returnGeometry: "false",
         f: "json",
       });
@@ -76,14 +42,7 @@ export class UsdaSummerMealBenefitChecker implements SummerMealBenefitChecker {
     if (attributes === undefined) {
       return { eligibility: "unknown" };
     }
-    return {
-      eligibility: toEligibility(attributes[AREA_ELIGIBILITY_FIELD]),
-      geoid: asString(attributes[AREA_EVIDENCE_FIELDS.geoid]),
-      county: asString(attributes[AREA_EVIDENCE_FIELDS.county]),
-      blockGroupPct: asNumber(attributes[AREA_EVIDENCE_FIELDS.blockGroupPct]),
-      tractPct: asNumber(attributes[AREA_EVIDENCE_FIELDS.tractPct]),
-      averagedPct: asNumber(attributes[AREA_EVIDENCE_FIELDS.averagedPct]),
-    };
+    return { eligibility: toEligibility(attributes[AREA_ELIGIBILITY_FIELD]) };
   }
 }
 
@@ -121,12 +80,4 @@ function firstFeatureAttributes(payload: unknown): Record<string, unknown> | und
     return undefined;
   }
   return attributes as Record<string, unknown>;
-}
-
-function asString(value: unknown): string | undefined {
-  return typeof value === "string" && value.length > 0 ? value : undefined;
-}
-
-function asNumber(value: unknown): number | undefined {
-  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
 }

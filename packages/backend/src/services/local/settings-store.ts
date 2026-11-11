@@ -5,7 +5,7 @@ import { dirname } from "node:path";
 import type {
   CredentialInput,
   CredentialStatus,
-  SmartyCredentialField as SmartyCredential,
+  SmartyCredentialField,
   SmartyCredentials,
 } from "../../types/credentials.js";
 
@@ -13,7 +13,7 @@ import type {
 const maximumCredentialLength = 4096;
 
 /** The Smarty secrets this store holds. */
-const smartyCredentials: readonly SmartyCredential[] = ["smartyAuthId", "smartyAuthToken"];
+const smartyCredentials: readonly SmartyCredentialField[] = ["smartyAuthId", "smartyAuthToken"];
 
 export interface SecretProtector {
   isEncryptionAvailable(): boolean;
@@ -23,7 +23,7 @@ export interface SecretProtector {
 
 interface StoredSettings {
   readonly version: 1;
-  readonly credentials: Partial<Record<SmartyCredential, string>>;
+  readonly credentials: Partial<Record<SmartyCredentialField, string>>;
 }
 
 const emptySettings = (): StoredSettings => ({ version: 1, credentials: {} });
@@ -46,7 +46,7 @@ export class SettingsStore {
    * Replace the stored key. The whole file is written afresh, so an unreadable
    * one is replaced rather than blocking every save.
    */
-  public async save({ authId, authToken }: SmartyCredentials): Promise<CredentialStatus> {
+  public async save({ authId, authToken }: SmartyCredentials): Promise<void> {
     if (!this.protector.isEncryptionAvailable()) {
       throw new Error("Secure credential storage is unavailable on this device.");
     }
@@ -58,7 +58,6 @@ export class SettingsStore {
       version: 1,
       credentials: { smartyAuthId: this.encrypt(authId), smartyAuthToken: this.encrypt(authToken) },
     });
-    return this.getStatus();
   }
 
   private encrypt(value: string): string {
@@ -67,7 +66,7 @@ export class SettingsStore {
 
   public async getCredentials(): Promise<CredentialInput> {
     const { credentials } = await this.read();
-    const decrypted: Partial<Record<SmartyCredential, string>> = {};
+    const decrypted: Partial<Record<SmartyCredentialField, string>> = {};
     for (const name of smartyCredentials) {
       const value = this.decrypt(credentials[name]);
       if (value !== undefined) {
@@ -144,7 +143,7 @@ export function parseCredentialInput(value: unknown): CredentialInput {
   }
 
   const source = value as Record<string, unknown>;
-  const input: Partial<Record<SmartyCredential, string>> = {};
+  const input: Partial<Record<SmartyCredentialField, string>> = {};
   for (const name of smartyCredentials) {
     const credential = source[name];
     if (credential !== undefined && typeof credential !== "string") {
@@ -169,7 +168,7 @@ function parseSettings(value: unknown): StoredSettings {
   }
 
   const source = storedCredentials as Record<string, unknown>;
-  const credentials: Partial<Record<SmartyCredential, string>> = {};
+  const credentials: Partial<Record<SmartyCredentialField, string>> = {};
   for (const name of smartyCredentials) {
     if (typeof source[name] === "string") {
       credentials[name] = source[name];

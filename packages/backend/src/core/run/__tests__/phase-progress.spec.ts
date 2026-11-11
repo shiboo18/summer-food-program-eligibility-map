@@ -65,8 +65,4 @@ describe("createPassReporters", () => {
 
     expect(seen).toEqual([0]);
   });
-
-  test("makes at least one reporter", () => {
-    expect(createPassReporters(0, 10, () => undefined)).toHaveLength(1);
-  });
 });

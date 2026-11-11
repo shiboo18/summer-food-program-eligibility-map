@@ -4,6 +4,7 @@ import type {
   CredentialInput,
   CredentialVerification,
   SmartyCredentials,
+  SmartyCredentialsProvider,
 } from "../types/credentials.js";
 
 /** Shown when a save reaches the main process without a whole key. */
@@ -19,14 +20,9 @@ export function toSmartyCredentials(input: CredentialInput): SmartyCredentials |
   return authId && authToken ? { authId, authToken } : undefined;
 }
 
-/** Name a key's halves the way the store and the form do; the reverse of `toSmartyCredentials`. */
-export function toCredentialInput({ authId, authToken }: SmartyCredentials): CredentialInput {
-  return { smartyAuthId: authId, smartyAuthToken: authToken };
-}
-
 /** Report the stored key's state for the renderer: not set, or Smarty's verdict, never the key. */
 export async function checkStoredCredentials(
-  getStored: () => Promise<SmartyCredentials | undefined>,
+  getStored: SmartyCredentialsProvider,
   verifier: CredentialVerifier,
 ): Promise<CredentialCheck> {
   const credentials = await getStored();

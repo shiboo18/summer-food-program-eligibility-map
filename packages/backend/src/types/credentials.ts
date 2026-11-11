@@ -13,6 +13,9 @@ export interface SmartyCredentials {
   readonly authToken: string;
 }
 
+/** Read the stored key, or `undefined` when either half is missing. */
+export type SmartyCredentialsProvider = () => Promise<SmartyCredentials | undefined>;
+
 /** What Smarty said when asked about a secret key. */
 export type CredentialVerification = "validated" | "rejected" | "no-subscription" | "unreachable";
 

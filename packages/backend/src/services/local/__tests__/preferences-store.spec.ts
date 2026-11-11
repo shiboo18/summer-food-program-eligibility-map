@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, test } from "vitest";
 
-import { AppPreferenceStore as PreferencesStore } from "../preferences-store.js";
+import { PreferencesStore } from "../preferences-store.js";
 import { defaultPreferences } from "../../../types/preferences.js";
 
 const directories: string[] = [];
@@ -157,5 +157,4 @@ describe("PreferencesStore", () => {
 
     expect(updated.accessibility.theme).toBe("system");
   });
-
 });

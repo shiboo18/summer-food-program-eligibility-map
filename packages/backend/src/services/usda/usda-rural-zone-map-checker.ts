@@ -1,9 +1,8 @@
 import type { HttpGetClient, RuralZoneChecker } from "../../contracts.js";
-import type { CheckOutcome, GeoPoint, LocatedRow, RuralResult } from "../../types/eligibility.js";
+import type { GeoPoint, LocatedRow, RuralResult } from "../../types/eligibility.js";
 import type { ProgressReporter } from "../../types/progress.js";
-import { USDA_CHECK_CONCURRENCY, USDA_RURAL_CRITERIA, USDA_RURAL_LAYER_IDS } from "../../config/constants.js";
-import { mapWithConcurrency } from "../../core/run/concurrency.js";
-import { coordinateKey } from "../../core/run/geocode-quality.js";
+import { USDA_RURAL_LAYER_IDS } from "../../config/constants.js";
+import { checkByCoordinate } from "../../core/run/concurrency.js";
 
 /**
  * `layerDefs` selecting every rural-criteria layer with no attribute filter, so
@@ -13,8 +12,7 @@ const ruralLayerDefs = JSON.stringify(Object.fromEntries(USDA_RURAL_LAYER_IDS.ma
 
 /**
  * Determines USDA rural designation by intersecting each point with the
- * rural-criteria layers. A point in any layer is rural; the matched layers are
- * reported as human-readable criteria.
+ * rural-criteria layers. A point in any layer is rural.
  *
  * All layers are asked for in one `layerDefs` query per point, and points are
  * paced a few at a time so a large sheet does not flood a free public service.
@@ -25,25 +23,8 @@ export class UsdaRuralZoneMapChecker implements RuralZoneChecker {
   public async checkZoneBatch(
     rows: readonly LocatedRow[],
     onProgress?: ProgressReporter,
-  ): Promise<ReadonlyMap<number, CheckOutcome<RuralResult>>> {
-    /* Rows at the same coordinate share one in-flight lookup and its outcome,
-       failures included. Scoped to this call, so nothing outlives the run. */
-    const byCoordinate = new Map<string, Promise<RuralResult>>();
-    const outcomes = await mapWithConcurrency(
-      rows,
-      USDA_CHECK_CONCURRENCY,
-      async (row) => {
-        const key = coordinateKey(row.geocode.point);
-        let pending = byCoordinate.get(key);
-        if (pending === undefined) {
-          pending = this.ruralDesignationAt(row.geocode.point);
-          byCoordinate.set(key, pending);
-        }
-        return pending;
-      },
-      onProgress,
-    );
-    return new Map(rows.map((row, index) => [row.rowNumber, outcomes[index] as CheckOutcome<RuralResult>]));
+  ): Promise<ReadonlyMap<number, RuralResult | undefined>> {
+    return checkByCoordinate(rows, (point) => this.ruralDesignationAt(point), onProgress);
   }
 
   private async ruralDesignationAt(point: GeoPoint): Promise<RuralResult> {
@@ -65,15 +46,7 @@ export class UsdaRuralZoneMapChecker implements RuralZoneChecker {
     }
 
     const counts = layerCounts(payload);
-    /* Ordered by the configured layer ids, not the response order, so the matched
-       criteria a partner reads are stable however the service returns them. */
-    const matchedCriteria = USDA_RURAL_LAYER_IDS.filter((id) => (counts.get(id) ?? 0) > 0).map(
-      (id) => USDA_RURAL_CRITERIA[id] ?? `Rural criteria layer ${id}`,
-    );
-    return {
-      designation: matchedCriteria.length > 0 ? "rural" : "not-rural",
-      matchedCriteria,
-    };
+    return { designation: USDA_RURAL_LAYER_IDS.some((id) => (counts.get(id) ?? 0) > 0) ? "rural" : "not-rural" };
   }
 }
 

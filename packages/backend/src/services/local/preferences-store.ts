@@ -1,24 +1,24 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
+import { isCellReference } from "../../core/cell-reference.js";
+
 import {
   defaultPreferences,
   mappingFields,
   themeModes,
   type AppAccessibilitySettings,
-  type AppPreferences,
+  type Preferences,
   type CachedColumnMapping,
   type ThemeMode,
 } from "../../types/preferences.js";
 
 /** Header cells such as `A1`. Anything else, including a stored column name, is dropped. */
-const headerCellPattern = /^[A-Za-z]{1,3}[0-9]{1,7}$/;
-
 function isHeaderCell(value: unknown): value is string {
-  return typeof value === "string" && headerCellPattern.test(value.trim());
+  return typeof value === "string" && isCellReference(value);
 }
 
-export class AppPreferenceStore {
+export class PreferencesStore {
   public constructor(private readonly filePath: string) {}
 
   /**
@@ -26,7 +26,7 @@ export class AppPreferenceStore {
    * such as a file truncated mid-write. These are remembered answers, so starting
    * over is better than refusing to start.
    */
-  public async get(): Promise<AppPreferences> {
+  public async get(): Promise<Preferences> {
     let contents: string;
     try {
       contents = await readFile(this.filePath, "utf8");
@@ -44,7 +44,7 @@ export class AppPreferenceStore {
    * Replace the preferences named in the patch. A grouped preference is replaced
    * whole, not merged, so a caller changing one field sends the rest of its group.
    */
-  public async update(patch: unknown): Promise<AppPreferences> {
+  public async update(patch: unknown): Promise<Preferences> {
     const current = await this.get();
     const next = parsePreferences({ ...current, ...parsePatch(patch) });
     await mkdir(dirname(this.filePath), { recursive: true });
@@ -54,7 +54,7 @@ export class AppPreferenceStore {
 }
 
 /** Keeps only the fields preferences actually have, so an unknown key cannot be stored. */
-function parsePatch(value: unknown): Partial<AppPreferences> {
+function parsePatch(value: unknown): Partial<Preferences> {
   if (typeof value !== "object" || value === null) {
     throw new Error("Preferences are invalid.");
   }
@@ -65,11 +65,11 @@ function parsePatch(value: unknown): Partial<AppPreferences> {
       patch[key] = source[key];
     }
   }
-  return patch as Partial<AppPreferences>;
+  return patch as Partial<Preferences>;
 }
 
 /** Every field falls back to its default, so an unreadable file reads as the defaults. */
-function parsePreferences(value: unknown): AppPreferences {
+function parsePreferences(value: unknown): Preferences {
   const source = asRecord(value);
   return {
     accessibility: parseAccessibility(source.accessibility),

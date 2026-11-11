@@ -1,5 +1,6 @@
 import type {
   ColumnMapping,
+  EligibilityChecks,
   EligibilityReport,
   Preferences,
   RunPhase,
@@ -17,13 +18,8 @@ import {
   preferredHeader,
   type AddressField,
 } from "../../../backend/dist/core/address-fields.js";
-import {
-  canRunChecks,
-  resolveCheckControls,
-  resultColumnsFor,
-  selectedEligibilityChecks,
-  type EligibilityCheckSelection,
-} from "../../../backend/dist/core/eligibility-checks.js";
+import { columnLetters } from "../../../backend/dist/core/cell-reference.js";
+import { resultColumnsFor } from "../../../backend/dist/core/eligibility-checks.js";
 import {
   activeRunPhases,
   runPhaseCopy,
@@ -31,10 +27,11 @@ import {
   runProgressView,
 } from "../../../backend/dist/core/run-progress.js";
 import { defaultPreferences } from "../../../backend/dist/types/preferences.js";
-import { getRequiredElement } from "./dom.js";
+import { createField, getRequiredElement, setBusy, showError } from "./dom.js";
 import { systemNotifier, type Notifier } from "./notifier.js";
 import type { Tone } from "./tone.js";
 import { createBackgroundQueue } from "./workflow/background-queue.js";
+import { createCloseButton } from "./settings/dialog.js";
 import { createSettingsPanel } from "./settings/settings-panel.js";
 import { singleFlight } from "./workflow/single-flight.js";
 import { resultsLocation } from "./workflow/steps/checks-step.js";
@@ -88,13 +85,10 @@ const introEyebrow = getRequiredElement<HTMLElement>("#intro-eyebrow");
 const introTitle = getRequiredElement<HTMLElement>("#intro-title");
 const introCopy = getRequiredElement<HTMLElement>("#intro-copy");
 const uploadExcelButton = getRequiredElement<HTMLButtonElement>("#upload-excel");
-const uploadSpinner = getRequiredElement<HTMLElement>("#upload-spinner");
-const uploadLabel = getRequiredElement<HTMLElement>("#upload-label");
 const excelFileStatus = getRequiredElement<HTMLElement>("#excel-file-status");
 const excelFileMessage = getRequiredElement<HTMLElement>("#excel-file-message");
 const excelFileSpinner = getRequiredElement<HTMLElement>("#excel-file-spinner");
 const mappingForm = getRequiredElement<HTMLFormElement>("#mapping-form");
-const formMessage = getRequiredElement<HTMLElement>("#form-message");
 const resultsStats = getRequiredElement<HTMLElement>("#results-stats");
 const processingSection = getRequiredElement<HTMLElement>("#processing-section");
 const processingBar = getRequiredElement<HTMLElement>("#processing-bar");
@@ -111,35 +105,36 @@ const workflowSidebar = getRequiredElement<HTMLElement>(".workflow-sidebar");
 const checksSection = getRequiredElement<HTMLElement>("#checks-section");
 
 const checkInputs = {
-  addressValidation: getRequiredElement<HTMLInputElement>("#check-address-validation"),
   rural: getRequiredElement<HTMLInputElement>("#check-rural"),
   area: getRequiredElement<HTMLInputElement>("#check-area"),
 };
 const runChecksButton = getRequiredElement<HTMLButtonElement>("#run-checks");
-const runChecksSpinner = getRequiredElement<HTMLElement>("#run-checks-spinner");
-const runChecksLabel = getRequiredElement<HTMLElement>("#run-checks-label");
 const checksMessage = getRequiredElement<HTMLElement>("#checks-message");
 const checksResultsLocation = getRequiredElement<HTMLElement>("#checks-results-location");
 const mappingHint = getRequiredElement<HTMLElement>("#mapping-hint");
 
 const mappingSelects = Object.fromEntries(
-  addressFields.map(({ field }) => [field, getRequiredElement<HTMLSelectElement>(`#map-${field}`)]),
+  addressFields.map(({ field }) => {
+    const select = document.createElement("select");
+    select.id = `map-${field}`;
+    return [field, select];
+  }),
 ) as Record<AddressField, HTMLSelectElement>;
+mappingHint.after(
+  ...addressFields.map(({ field, label, optional }) => createField(mappingSelects[field], label, optional)),
+);
 
 type Stage = "upload" | "map-columns" | "checks" | "results";
 let stage: Stage = "upload";
 let selectedSpreadsheet: SpreadsheetSelection | null = null;
 let lastReport: ValidationReport | null = null;
-let lastEligibility: EligibilityReport | null = null;
-let lastChecks: { readonly rural: boolean; readonly area: boolean } | null = null;
+let lastChecks: EligibilityChecks | null = null;
 
 const workflowStepList = getRequiredElement<HTMLOListElement>("#workflow-steps");
 
 function workflowContext(): WorkflowContext {
   return {
     fileName: selectedSpreadsheet?.fileName ?? null,
-    rowCount: selectedSpreadsheet?.rowCount ?? 0,
-    columnCount: selectedSpreadsheet?.headers.length ?? 0,
     report: lastReport,
   };
 }
@@ -250,13 +245,6 @@ function setFileStatus(message: string, state: FileStatusState): void {
   excelFileSpinner.hidden = state !== "pending";
 }
 
-function setUploadLoading(loading: boolean): void {
-  uploadExcelButton.disabled = loading;
-  uploadExcelButton.setAttribute("aria-busy", String(loading));
-  uploadSpinner.hidden = !loading;
-  uploadLabel.textContent = loading ? "Checking file" : "Upload Excel file";
-}
-
 function fillMappingSelect(
   select: HTMLSelectElement,
   headers: readonly string[],
@@ -292,7 +280,7 @@ function renderMapping(selection: SpreadsheetSelection): void {
 }
 
 async function openSpreadsheet(): Promise<void> {
-  setUploadLoading(true);
+  setBusy(uploadExcelButton, true, "Checking file");
   setFileStatus("Checking the file opens as an Excel workbook…", "pending");
 
   const selection = bridge.spreadsheet.open();
@@ -305,8 +293,6 @@ async function openSpreadsheet(): Promise<void> {
 
     selectedSpreadsheet = result;
     lastReport = null;
-    formMessage.textContent = "";
-    formMessage.dataset.tone = "idle";
     setFileStatus("Checked — this is a readable Excel workbook.", "success");
     goToStage("map-columns");
   } catch (error: unknown) {
@@ -316,7 +302,7 @@ async function openSpreadsheet(): Promise<void> {
     setFileStatus("", "idle");
     notifier.failure(friendlyMessage(error, "That file could not be opened. Try a different Excel file."));
   } finally {
-    setUploadLoading(false);
+    setBusy(uploadExcelButton, false, "Upload Excel file");
   }
 }
 
@@ -343,13 +329,8 @@ function currentMapping(): ColumnMapping {
  */
 function finishMapColumns(): void {
   if (selectedSpreadsheet === null) {
-    formMessage.textContent = "Upload an Excel file first.";
-    formMessage.dataset.tone = "error";
     return;
   }
-  formMessage.textContent = "";
-  formMessage.dataset.tone = "idle";
-
   const chosen = currentMapping();
   const { headers, headerRowNumber } = selectedSpreadsheet;
   savePreferences(() => ({ columnMapping: cachedColumnMapping(chosen, headers, headerRowNumber) }));
@@ -383,53 +364,23 @@ for (const { field } of addressFields) {
   });
 }
 
-/* USDA eligibility checks. */
-function currentCheckSelection(): EligibilityCheckSelection {
-  return {
-    addressValidation: checkInputs.addressValidation.checked,
-    rural: checkInputs.rural.checked,
-    area: checkInputs.area.checked,
-  };
+/* USDA eligibility checks. The address check always runs, so only these two vary. */
+function currentChecks(): EligibilityChecks {
+  return { rural: checkInputs.rural.checked, area: checkInputs.area.checked };
 }
 
-/** Keep the USDA checkboxes and the run button in step with the selection rule. */
-function syncCheckControls(): void {
-  const selection = currentCheckSelection();
-  const controls = resolveCheckControls(selection);
-  checkInputs.rural.disabled = !controls.ruralEnabled;
-  checkInputs.area.disabled = !controls.areaEnabled;
-  if (!controls.ruralEnabled) {
-    checkInputs.rural.checked = false;
-  }
-  if (!controls.areaEnabled) {
-    checkInputs.area.checked = false;
-  }
-  setRunChecksEnabled(canRunChecks(currentCheckSelection()));
-  checksResultsLocation.textContent = resultsLocation(
-    resultColumnsFor(RESULT_COLUMNS, selectedEligibilityChecks(currentCheckSelection())),
-  );
+function showResultsLocation(): void {
+  checksResultsLocation.textContent = resultsLocation(resultColumnsFor(currentChecks()));
 }
 
-function setRunChecksEnabled(enabled: boolean): void {
-  runChecksButton.disabled = !enabled;
+for (const input of [checkInputs.rural, checkInputs.area]) {
+  input.addEventListener("change", showResultsLocation);
 }
 
-for (const input of [checkInputs.addressValidation, checkInputs.rural, checkInputs.area]) {
-  input.addEventListener("change", syncCheckControls);
-}
-
-/** Pre-select the optional checks, then normalize anything the dependency rule disallows. */
-function applyCheckDefaults(selection: Preferences["checkSelection"]): void {
-  checkInputs.rural.checked = selection.rural;
-  checkInputs.area.checked = selection.area;
-  syncCheckControls();
-}
-
-function setRunChecksLoading(loading: boolean): void {
-  setRunChecksEnabled(!loading && canRunChecks(currentCheckSelection()));
-  runChecksButton.setAttribute("aria-busy", String(loading));
-  runChecksSpinner.hidden = !loading;
-  runChecksLabel.textContent = loading ? "Running checks" : "Run checks";
+function applyCheckDefaults(): void {
+  checkInputs.rural.checked = preferences.checkSelection.rural;
+  checkInputs.area.checked = preferences.checkSelection.area;
+  showResultsLocation();
 }
 
 /**
@@ -446,21 +397,12 @@ function renderCombinedResults(validation: ValidationReport, eligibility: Eligib
   resetExportButton();
   const deliverableCount = validation.verified + validation.corrected;
 
-  renderResultsStats([
+  const stats = [
     { value: eligibility.total, label: "Rows checked", tone: "neutral" },
     { value: deliverableCount, label: "Deliverable", tone: "good" },
     { value: eligibility.ruralCount, label: "Rural designation", tone: "neutral" },
     { value: eligibility.areaEligibleCount, label: "Area eligible", tone: "neutral" },
-  ]);
-}
-
-interface ResultStat {
-  readonly value: number;
-  readonly label: string;
-  readonly tone: "neutral" | "good";
-}
-
-function renderResultsStats(stats: readonly ResultStat[]): void {
+  ];
   resultsStats.replaceChildren();
   for (const stat of stats) {
     const tile = document.createElement("div");
@@ -492,15 +434,10 @@ function renderRunSteps(current: RunPhase): void {
 
 /** Show the card's copy for the running step, so it names one step at a time. */
 function showRunPhase(phase: RunPhase): void {
-  const copy = runPhaseCopy(phase);
+  const copy = runPhaseCopy[phase];
   processingStatus.textContent = copy.detail;
   processingPrivacy.textContent = copy.privacy;
   renderRunSteps(phase);
-}
-
-/** Open the card on the first step, with the bar animating until a count arrives. */
-function startRunProgress(total: number): void {
-  showRunProgress({ phase: "verifying", completed: 0, total });
 }
 
 function showRunProgress(progress: RunProgress): void {
@@ -534,16 +471,9 @@ bridge.run.onProgress((progress: RunProgress): void => {
 
 async function performChecks(): Promise<void> {
   if (selectedSpreadsheet === null) {
-    checksMessage.textContent = "Upload an Excel file first.";
-    checksMessage.dataset.tone = "error";
     return;
   }
-  const selection = currentCheckSelection();
-  if (!canRunChecks(selection)) {
-    checksMessage.textContent = "The address check is required.";
-    checksMessage.dataset.tone = "error";
-    return;
-  }
+  const checks = currentChecks();
 
   const { blocker } = settingsPanel.credentialView();
   if (blocker !== undefined) {
@@ -555,14 +485,13 @@ async function performChecks(): Promise<void> {
 
   /* Saved behind the run rather than before it, so the store is never what the
      partner waits on. */
-  savePreferences(() => ({ checkSelection: { rural: selection.rural, area: selection.area } }));
+  savePreferences(() => ({ checkSelection: checks }));
 
-  setRunChecksLoading(true);
+  setBusy(runChecksButton, true, "Running checks");
   checksMessage.textContent = "";
-  checksMessage.dataset.tone = "idle";
-  lastChecks = selectedEligibilityChecks(selection);
+  lastChecks = checks;
   activeRunPhaseList = activeRunPhases(lastChecks);
-  startRunProgress(selectedSpreadsheet.rowCount);
+  showRunProgress({ phase: "verifying", completed: 0, total: selectedSpreadsheet.rowCount });
   checksSection.hidden = true;
   processingSection.hidden = false;
   setUiFrozen(true);
@@ -575,24 +504,18 @@ async function performChecks(): Promise<void> {
     if (firstUsdaPhase !== undefined) {
       showRunProgress({ phase: firstUsdaPhase, completed: 0, total: selectedSpreadsheet.rowCount });
     }
-    const eligibility = await bridge.eligibility.check(
-      selectedSpreadsheet.fileName,
-      mapping,
-      selectedEligibilityChecks(selection),
-    );
+    const eligibility = await bridge.eligibility.check(selectedSpreadsheet.fileName, mapping, checks);
     lastReport = validation;
-    lastEligibility = eligibility;
     renderCombinedResults(validation, eligibility);
     processingSection.hidden = true;
     goToStage("results");
   } catch (error: unknown) {
     processingSection.hidden = true;
     checksSection.hidden = false;
-    checksMessage.textContent = friendlyMessage(error, "The checks failed.");
-    checksMessage.dataset.tone = "error";
+    showError(checksMessage, error, "The checks failed.");
   } finally {
     setUiFrozen(false);
-    setRunChecksLoading(false);
+    setBusy(runChecksButton, false, "Run checks");
   }
 }
 
@@ -609,14 +532,11 @@ runChecksButton.addEventListener("click", (): void => {
 getRequiredElement<HTMLButtonElement>("#start-over").addEventListener("click", (): void => {
   selectedSpreadsheet = null;
   lastReport = null;
-  lastEligibility = null;
   setFileStatus("", "idle");
   goToStage("upload");
 });
 
 const downloadResultsButton = getRequiredElement<HTMLButtonElement>("#download-results");
-const downloadSpinner = getRequiredElement<HTMLElement>("#download-spinner");
-const downloadLabel = getRequiredElement<HTMLElement>("#download-label");
 const downloadMessage = getRequiredElement<HTMLElement>("#download-message");
 
 /** After a successful export the primary button reveals the file rather than re-exporting. */
@@ -626,34 +546,16 @@ function exportButtonLabel(): string {
   return resultsExported ? "Open exported file" : "Export results (Excel)";
 }
 
-function setDownloadLoading(loading: boolean): void {
-  downloadResultsButton.disabled = loading;
-  downloadResultsButton.setAttribute("aria-busy", String(loading));
-  downloadSpinner.hidden = !loading;
-  downloadLabel.textContent = loading ? "Saving" : exportButtonLabel();
-}
-
 /** Return the button to its pre-export state; called each time results are shown. */
 function resetExportButton(): void {
   resultsExported = false;
-  downloadLabel.textContent = exportButtonLabel();
+  setBusy(downloadResultsButton, false, exportButtonLabel());
   downloadMessage.textContent = "";
-  downloadMessage.dataset.tone = "idle";
-}
-
-function columnLetter(columnNumber: number): string {
-  let n = columnNumber;
-  let letter = "";
-  while (n > 0) {
-    letter = String.fromCharCode(65 + ((n - 1) % 26)) + letter;
-    n = Math.floor((n - 1) / 26);
-  }
-  return letter;
 }
 
 function renderExportMessage(filePath: string): void {
   const originalCount = selectedSpreadsheet?.headers.length ?? 0;
-  const added = resultColumnsFor(RESULT_COLUMNS, lastChecks ?? { rural: false, area: false });
+  const added = resultColumnsFor(lastChecks ?? { rural: false, area: false });
 
   const lead = document.createElement("p");
   lead.textContent = `Saved a copy to ${filePath}. Your original file is unchanged. New columns, after your data:`;
@@ -663,7 +565,7 @@ function renderExportMessage(filePath: string): void {
   added.forEach((column, index) => {
     const item = document.createElement("li");
     const identifier = document.createElement("strong");
-    identifier.textContent = `Column ${columnLetter(originalCount + index + 1)}`;
+    identifier.textContent = `Column ${columnLetters(originalCount + index + 1)}`;
     const detail = column === RESULT_COLUMNS.standardized ? ` — ${column} (corrected rows only)` : ` — ${column}`;
     item.append(identifier, document.createTextNode(detail));
     list.append(item);
@@ -673,12 +575,11 @@ function renderExportMessage(filePath: string): void {
 }
 
 async function exportResults(): Promise<void> {
-  if (selectedSpreadsheet === null || lastEligibility === null) {
+  if (selectedSpreadsheet === null || lastReport === null) {
     return;
   }
-  setDownloadLoading(true);
+  setBusy(downloadResultsButton, true, "Saving");
   downloadMessage.textContent = "";
-  downloadMessage.dataset.tone = "idle";
   try {
     const result = await bridge.results.export(selectedSpreadsheet.fileName);
     if (result.canceled || result.filePath === undefined) {
@@ -688,10 +589,9 @@ async function exportResults(): Promise<void> {
     downloadMessage.dataset.tone = "success";
     renderExportMessage(result.filePath);
   } catch (error: unknown) {
-    downloadMessage.textContent = friendlyMessage(error, "Could not save the results file.");
-    downloadMessage.dataset.tone = "error";
+    showError(downloadMessage, error, "Could not save the results file.");
   } finally {
-    setDownloadLoading(false);
+    setBusy(downloadResultsButton, false, exportButtonLabel());
   }
 }
 
@@ -702,8 +602,7 @@ async function openExportedFile(): Promise<void> {
   try {
     await bridge.results.open(selectedSpreadsheet.fileName);
   } catch (error: unknown) {
-    downloadMessage.textContent = friendlyMessage(error, "Could not open the exported file.");
-    downloadMessage.dataset.tone = "error";
+    showError(downloadMessage, error, "Could not open the exported file.");
   }
 }
 
@@ -723,10 +622,6 @@ const homeStartButton = getRequiredElement<HTMLButtonElement>("#home-start");
 const settingsPanel = createSettingsPanel({
   getPreferences: () => preferences,
   updatePreferences,
-  adoptPreferences: (next: Preferences): void => {
-    preferences = next;
-    applyAppearance();
-  },
   applyCheckDefaults,
   applyColumnDefaults: (): void => {
     if (selectedSpreadsheet !== null) {
@@ -768,7 +663,7 @@ function showView(view: View): void {
 function showSettings(visible: boolean): void {
   showView(visible ? "settings" : "workflow");
   if (visible) {
-    getRequiredElement<HTMLButtonElement>("#settings-close").focus();
+    settingsClose.focus();
     return;
   }
   settingsToggle.focus();
@@ -816,7 +711,9 @@ getRequiredElement<HTMLAnchorElement>("#home-credential-notice-link").addEventLi
 });
 
 settingsToggle.addEventListener("click", (): void => showSettings(settingsView.hidden !== false));
-getRequiredElement<HTMLButtonElement>("#settings-close").addEventListener("click", (): void => showSettings(false));
+const settingsClose = createCloseButton("Close settings");
+getRequiredElement<HTMLElement>(".settings-view-head").append(settingsClose);
+settingsClose.addEventListener("click", (): void => showSettings(false));
 
 /* Startup. */
 async function initialize(): Promise<void> {
@@ -836,7 +733,7 @@ async function initialize(): Promise<void> {
   settingsPanel.refresh();
   renderWorkflow();
   renderHomeSteps();
-  applyCheckDefaults(preferences.checkSelection);
+  applyCheckDefaults();
   showView("home");
   /* Not awaited: the home page is usable while Smarty answers. */
   void settingsPanel.checkCredentials();

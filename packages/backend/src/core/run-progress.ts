@@ -105,7 +105,8 @@ export interface RunPhaseCopy {
 const usdaPrivacy =
   "Only addresses and their map locations are sent to the public USDA and ArcGIS maps — nothing else leaves this computer";
 
-const phaseCopy: Readonly<Record<RunPhase, RunPhaseCopy>> = {
+/** What the run screen reads while each phase is running. */
+export const runPhaseCopy: Readonly<Record<RunPhase, RunPhaseCopy>> = {
   verifying: {
     detail: "Checking each address against USPS records with Smarty",
     privacy: "Only addresses are sent to Smarty — nothing else leaves this computer",
@@ -119,11 +120,6 @@ const phaseCopy: Readonly<Record<RunPhase, RunPhaseCopy>> = {
     privacy: usdaPrivacy,
   },
 };
-
-/** Return what the run screen reads while `phase` is running. */
-export function runPhaseCopy(phase: RunPhase): RunPhaseCopy {
-  return phaseCopy[phase];
-}
 
 function clamp(value: number, low: number, high: number): number {
   return Math.min(Math.max(value, low), high);

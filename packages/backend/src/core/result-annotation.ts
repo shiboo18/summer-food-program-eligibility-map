@@ -47,6 +47,11 @@ const ruralLabelsApproximate: Record<RuralDesignation, RuralLabel> = {
   "not-rural": "Not Rural (approximate location)",
 };
 
+/** Return whether Smarty's verdict lets the row go on to the USDA checks. */
+export function isDeliverable(status: AddressVerificationStatus): boolean {
+  return status === "verified" || status === "corrected";
+}
+
 /**
  * Build one row's sponsor-readable result annotation from its Smarty
  * verification and, when the checks ran, its eligibility result.
@@ -63,7 +68,7 @@ export function toResultAnnotation(
   checks: EligibilityChecks,
   eligibility: EligibilityRowResult | undefined,
 ): ResultAnnotation {
-  const deliverable = verification.status === "verified" || verification.status === "corrected";
+  const deliverable = isDeliverable(verification.status);
   const hasResult = deliverable && eligibility !== undefined;
   const precision = eligibility?.precision ?? "unknown";
   const trusted = isTrustedPrecision(precision);

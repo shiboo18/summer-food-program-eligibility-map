@@ -8,17 +8,13 @@ function after<Value>(ms: number, value: Value): Promise<Value> {
 }
 
 describe("mapWithConcurrency", () => {
-  test("returns outcomes in input order however they finish", async () => {
-    const outcomes = await mapWithConcurrency([30, 10, 20], 3, async (ms) => after(ms, `done ${String(ms)}`));
+  test("returns values in input order however they finish", async () => {
+    const values = await mapWithConcurrency([30, 10, 20], 3, async (ms) => after(ms, `done ${String(ms)}`));
 
-    expect(outcomes).toEqual([
-      { ok: true, value: "done 30" },
-      { ok: true, value: "done 10" },
-      { ok: true, value: "done 20" },
-    ]);
+    expect(values).toEqual(["done 30", "done 10", "done 20"]);
   });
 
-  test("captures a failure as an outcome and still runs every other item", async () => {
+  test("reads a failure as undefined and still runs every other item", async () => {
     const work = vi.fn(async (item: number) => {
       if (item === 2) {
         throw new Error("layer unavailable");
@@ -26,22 +22,18 @@ describe("mapWithConcurrency", () => {
       return item * 10;
     });
 
-    const outcomes = await mapWithConcurrency([1, 2, 3], 2, work);
+    const values = await mapWithConcurrency([1, 2, 3], 2, work);
 
-    expect(outcomes).toEqual([
-      { ok: true, value: 10 },
-      { ok: false, reason: "layer unavailable" },
-      { ok: true, value: 30 },
-    ]);
+    expect(values).toEqual([10, undefined, 30]);
     expect(work).toHaveBeenCalledTimes(3);
   });
 
-  test("describes a thrown non-error", async () => {
-    const outcomes = await mapWithConcurrency([1], 1, async () => {
+  test("reads a thrown non-error as undefined too", async () => {
+    const values = await mapWithConcurrency([1], 1, async () => {
       throw "just a string";
     });
 
-    expect(outcomes).toEqual([{ ok: false, reason: "just a string" }]);
+    expect(values).toEqual([undefined]);
   });
 
   test("never exceeds the limit in flight", async () => {
@@ -87,15 +79,10 @@ describe("mapWithConcurrency", () => {
   });
 
   test("handles a single item and a limit larger than the list", async () => {
-    await expect(mapWithConcurrency([5], 6, async (item) => item * 2)).resolves.toEqual([
-      { ok: true, value: 10 },
-    ]);
+    await expect(mapWithConcurrency([5], 6, async (item) => item * 2)).resolves.toEqual([10]);
   });
 
   test("treats a limit below one as one", async () => {
-    await expect(mapWithConcurrency([1, 2], 0, async (item) => item)).resolves.toEqual([
-      { ok: true, value: 1 },
-      { ok: true, value: 2 },
-    ]);
+    await expect(mapWithConcurrency([1, 2], 0, async (item) => item)).resolves.toEqual([1, 2]);
   });
 });

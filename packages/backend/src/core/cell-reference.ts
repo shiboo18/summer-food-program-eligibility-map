@@ -28,16 +28,20 @@ export function rowNumberFromCell(value: string): number | undefined {
   return match === null ? undefined : Number(match[2]);
 }
 
-/** Return the cell for a 1-based column in the given row, so column 2 row 1 is `B1`. */
-export function cellAtColumn(column: number, row: number): string {
+/** Name a 1-based column the way a spreadsheet does, so column 27 is `AA`. */
+export function columnLetters(column: number): string {
   let letters = "";
   let remaining = column;
   while (remaining > 0) {
-    const index = (remaining - 1) % 26;
-    letters = String.fromCharCode(65 + index) + letters;
+    letters = String.fromCharCode(65 + ((remaining - 1) % 26)) + letters;
     remaining = Math.floor((remaining - 1) / 26);
   }
-  return `${letters}${row}`;
+  return letters;
+}
+
+/** Return the cell for a 1-based column in the given row, so column 2 row 1 is `B1`. */
+export function cellAtColumn(column: number, row: number): string {
+  return `${columnLetters(column)}${row}`;
 }
 
 /**

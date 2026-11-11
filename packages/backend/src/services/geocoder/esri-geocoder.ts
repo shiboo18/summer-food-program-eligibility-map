@@ -2,6 +2,7 @@ import type { Address } from "../../types/address.js";
 import type { Geocoder, HttpGetClient } from "../../contracts.js";
 import type { GeocodeResult, LocationPrecision } from "../../types/eligibility.js";
 import { ESRI_FIND_CANDIDATES_PATH } from "../../config/constants.js";
+import { formatAddress } from "../../core/address-shape.js";
 
 /**
  * Resolves addresses with the free, anonymous Esri World Geocoder, returning the
@@ -14,7 +15,7 @@ export class EsriGeocoder implements Geocoder {
     let payload: unknown;
     try {
       payload = await this.http.get(ESRI_FIND_CANDIDATES_PATH, {
-        singleLine: toSingleLine(address),
+        singleLine: formatAddress(address),
         outFields: "Match_addr,Addr_type",
         maxLocations: "1",
         f: "json",
@@ -33,21 +34,14 @@ export class EsriGeocoder implements Geocoder {
       point: { lat: candidate.y, lng: candidate.x },
       score: candidate.score,
       precision: candidate.precision,
-      matchedAddress: candidate.address,
     };
   }
-}
-
-function toSingleLine(address: Address): string {
-  const parts = [address.line1, address.line2, `${address.city}, ${address.state} ${address.postalCode}`];
-  return parts.filter((part): part is string => part !== undefined && part.length > 0).join(", ");
 }
 
 interface EsriCandidate {
   readonly x: number;
   readonly y: number;
   readonly score: number;
-  readonly address: string;
   readonly precision: LocationPrecision;
 }
 
@@ -105,7 +99,6 @@ function firstCandidate(payload: unknown): EsriCandidate | undefined {
     x: location.x,
     y: location.y,
     score: typeof candidate.score === "number" ? candidate.score : 0,
-    address: typeof candidate.address === "string" ? candidate.address : "",
     precision: toPrecision(asRecord(candidate.attributes)?.Addr_type),
   };
 }

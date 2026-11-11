@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 
 import type { RowVerification } from "../../types/address.js";
 import type { EligibilityRowResult } from "../../types/eligibility.js";
-import { toResultAnnotation } from "../result-annotation.js";
+import { isDeliverable, toResultAnnotation } from "../result-annotation.js";
 
 const bothChecks = { rural: true, area: true };
 const verified: RowVerification = { status: "verified" };
@@ -11,9 +11,6 @@ function row(overrides: Partial<EligibilityRowResult>): EligibilityRowResult {
   return {
     rowNumber: 2,
     precision: "rooftop",
-    confidence: "high",
-    needsVerification: false,
-    messages: [],
     ...overrides,
   };
 }
@@ -21,7 +18,7 @@ function row(overrides: Partial<EligibilityRowResult>): EligibilityRowResult {
 describe("toResultAnnotation", () => {
   test("maps a verified rooftop row's verdicts and location", () => {
     const annotation = toResultAnnotation(2, verified, bothChecks, row({
-      rural: { designation: "rural", matchedCriteria: ["County not part of an MSA"] },
+      rural: { designation: "rural" },
       area: { eligibility: "eligible" },
     }));
 
@@ -39,7 +36,7 @@ describe("toResultAnnotation", () => {
       3,
       { status: "corrected", standardizedAddress: "1 Main St, Austin, TX 78701" },
       bothChecks,
-      row({ area: { eligibility: "averaged-eligible" }, rural: { designation: "rural", matchedCriteria: [] } }),
+      row({ area: { eligibility: "averaged-eligible" }, rural: { designation: "rural" } }),
     );
 
     expect(annotation.deliverability).toBe("Valid and corrected");
@@ -50,7 +47,7 @@ describe("toResultAnnotation", () => {
 
   test("maps a not-rural, not-eligible row", () => {
     const annotation = toResultAnnotation(4, verified, bothChecks, row({
-      rural: { designation: "not-rural", matchedCriteria: [] },
+      rural: { designation: "not-rural" },
       area: { eligibility: "not-eligible" },
     }));
 
@@ -61,7 +58,7 @@ describe("toResultAnnotation", () => {
   test("hedges the verdicts when the location is approximate", () => {
     const annotation = toResultAnnotation(6, verified, bothChecks, row({
       precision: "postal",
-      rural: { designation: "rural", matchedCriteria: [] },
+      rural: { designation: "rural" },
       area: { eligibility: "eligible" },
     }));
 
@@ -73,7 +70,7 @@ describe("toResultAnnotation", () => {
   test("does not hedge a street-level location", () => {
     const annotation = toResultAnnotation(6, verified, bothChecks, row({
       precision: "street",
-      rural: { designation: "not-rural", matchedCriteria: [] },
+      rural: { designation: "not-rural" },
       area: { eligibility: "not-eligible" },
     }));
 
@@ -128,5 +125,15 @@ describe("toResultAnnotation", () => {
     const annotation = toResultAnnotation(8, verified, bothChecks, row({ area: { eligibility: "unknown" } }));
 
     expect(annotation.area).toBe("Not Verified");
+  });
+});
+
+describe("isDeliverable", () => {
+  test.each([
+    { status: "verified", deliverable: true },
+    { status: "corrected", deliverable: true },
+    { status: "unverified", deliverable: false },
+  ] as const)("when Smarty says $status, deliverable is $deliverable", ({ status, deliverable }) => {
+    expect(isDeliverable(status)).toBe(deliverable);
   });
 });
