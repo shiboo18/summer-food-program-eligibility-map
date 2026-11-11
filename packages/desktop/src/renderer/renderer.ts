@@ -1,15 +1,14 @@
 import type {
   ColumnMapping,
-  CredentialStatus,
   EligibilityReport,
   Preferences,
   RunPhase,
   RunProgress,
   ValidationReport,
 } from "../../../backend/dist/index.js";
-/* Leaf imports: these modules hold logic and constants only, so the renderer does
-   not pull the backend's Node-only dependencies into the browser context. Reaching
-   them through the backend's barrel would. */
+/* Leaf imports of logic and constants only: the backend's barrel would pull its
+   Node-only dependencies into the browser context. */
+import { RESULT_COLUMNS } from "../../../backend/dist/config/constants.js";
 import { resolveAppearance } from "../../../backend/dist/core/appearance.js";
 import {
   addressFields,
@@ -21,6 +20,7 @@ import {
 import {
   canRunChecks,
   resolveCheckControls,
+  resultColumnsFor,
   selectedEligibilityChecks,
   type EligibilityCheckSelection,
 } from "../../../backend/dist/core/eligibility-checks.js";
@@ -32,16 +32,21 @@ import {
 } from "../../../backend/dist/core/run-progress.js";
 import { defaultPreferences } from "../../../backend/dist/types/preferences.js";
 import { getRequiredElement } from "./dom.js";
+import { systemNotifier, type Notifier } from "./notifier.js";
+import type { Tone } from "./tone.js";
 import { createBackgroundQueue } from "./workflow/background-queue.js";
 import { createSettingsPanel } from "./settings/settings-panel.js";
 import { singleFlight } from "./workflow/single-flight.js";
+import { resultsLocation } from "./workflow/steps/checks-step.js";
 import { workflowSteps } from "./workflow/steps/index.js";
+import { headerRowHint } from "./workflow/steps/map-columns-step.js";
 import type { WorkflowContext } from "./workflow/workflow-step.js";
 import { formatRuntimeSummary } from "../shared/runtime-info.js";
-import { splitAroundFileName } from "../shared/text.js";
+import { friendlyMessage, splitAroundFileName } from "../shared/text.js";
 import type { SpreadsheetSelection } from "./runtime-api.js";
 
 const bridge = window.shareOurStrengths;
+const notifier: Notifier = systemNotifier;
 
 
 /* Appearance: apply persisted preferences and keep them live. */
@@ -69,10 +74,10 @@ const preferenceSaves = createBackgroundQueue((error: unknown): void => {
 });
 
 /**
- * Saves preferences without holding up the screen the answer was given on.
+ * Save preferences without holding up the screen.
  *
- * @param patch Built when the save's turn comes rather than now, so a group it
- *   carries over from the current preferences is the one the save before it left.
+ * @param patch Built when the save's turn comes rather than now, so any group it
+ *   copies from the current preferences includes the save before it.
  */
 function savePreferences(patch: () => Partial<Preferences>): void {
   preferenceSaves.enqueue((): Promise<void> => updatePreferences(patch()));
@@ -114,6 +119,8 @@ const runChecksButton = getRequiredElement<HTMLButtonElement>("#run-checks");
 const runChecksSpinner = getRequiredElement<HTMLElement>("#run-checks-spinner");
 const runChecksLabel = getRequiredElement<HTMLElement>("#run-checks-label");
 const checksMessage = getRequiredElement<HTMLElement>("#checks-message");
+const checksResultsLocation = getRequiredElement<HTMLElement>("#checks-results-location");
+const mappingHint = getRequiredElement<HTMLElement>("#mapping-hint");
 
 const mappingSelects = Object.fromEntries(
   addressFields.map(({ field }) => [field, getRequiredElement<HTMLSelectElement>(`#map-${field}`)]),
@@ -137,10 +144,7 @@ function workflowContext(): WorkflowContext {
   };
 }
 
-/**
- * Writes a step's sub-text, turning any mention of the loaded workbook into a
- * control that reveals it. Every step that names the file is covered from here.
- */
+/** Write a step's sub-text, turning any mention of the loaded workbook into a control that reveals it. */
 function renderIntroCopy(description: string, fileName: string | null): void {
   const mention = fileName === null ? null : splitAroundFileName(description, fileName);
   if (fileName === null || mention === null) {
@@ -157,14 +161,14 @@ function renderIntroCopy(description: string, fileName: string | null): void {
   link.addEventListener("click", (event): void => {
     event.preventDefault();
     void bridge.spreadsheet.reveal(fileName).catch((error: unknown): void => {
-      window.alert(friendlyMessage(error, "That file could not be shown."));
+      notifier.failure(friendlyMessage(error, "That file could not be shown."));
     });
   });
 
   introCopy.replaceChildren(mention.before, link, mention.after);
 }
 
-/** Renders the left step list plus the header and page for the active step. */
+/** Render the step list, header, and page for the active step. */
 function renderWorkflow(): void {
   const context = workflowContext();
   const activeIndex = Math.max(
@@ -200,7 +204,7 @@ function renderWorkflow(): void {
     button.addEventListener("click", (): void => goToStage(step.id as Stage));
 
     const number = document.createElement("span");
-    number.className = "workflow-step-number";
+    number.className = "step-badge";
     number.textContent = String(index + 1);
 
     const label = document.createElement("span");
@@ -219,8 +223,8 @@ function goToStage(next: Stage): void {
   if (step === undefined || !step.isAvailable(workflowContext())) {
     return;
   }
-  /* Built from the saved cells each time the screen is shown, not once per file, so
-     it reflects cells edited in the dialog and a file loaded since. */
+  /* Rebuilt from the saved cells each time the screen is shown, so it reflects
+     cells edited in the dialog and a file loaded since. */
   if (next === "map-columns" && selectedSpreadsheet !== null) {
     renderMapping(selectedSpreadsheet);
   }
@@ -234,16 +238,16 @@ function wait(milliseconds: number): Promise<void> {
 }
 
 /** What the workbook status line says, and whether it is still being worked out. */
-type FileStatusState = "idle" | "checking" | "valid" | "error";
+type FileStatusState = Extract<Tone, "idle" | "pending" | "success" | "error">;
 
 /**
- * Writes the workbook status line. The spinner turns for as long as the file is
- * being checked, so the wait reads as work rather than as a finished verdict.
+ * Write the workbook status line. The spinner turns while the file is being
+ * checked, so the wait reads as work rather than a finished verdict.
  */
 function setFileStatus(message: string, state: FileStatusState): void {
   excelFileMessage.textContent = message;
-  excelFileStatus.dataset.state = state;
-  excelFileSpinner.hidden = state !== "checking";
+  excelFileStatus.dataset.tone = state;
+  excelFileSpinner.hidden = state !== "pending";
 }
 
 function setUploadLoading(loading: boolean): void {
@@ -277,38 +281,19 @@ function fillMappingSelect(
   select.value = suggestion;
 }
 
-/**
- * Fills the selects from the saved cells, guessing only where nothing is saved.
- * Runs on every entry to the screen rather than once per file, so cells edited in
- * Settings are what it offers.
- */
+/** Fill the selects from the saved cells, guessing only where nothing is saved. */
 function renderMapping(selection: SpreadsheetSelection): void {
   const headers = selection.headers;
+  mappingHint.textContent = headerRowHint(selection.headerRowNumber);
   for (const { field, optional, candidates } of addressFields) {
     const preferred = preferredHeader(preferences.columnMapping[field], headers, candidates);
     fillMappingSelect(mappingSelects[field], headers, optional, preferred);
   }
 }
 
-/**
- * The message to show for a failed call, with Electron's IPC wrapper
- * ("Error invoking remote method '…': Error: …") peeled off so the partner sees
- * only the plain message the main process meant, never the internal channel name.
- */
-function friendlyMessage(error: unknown, fallback: string): string {
-  if (!(error instanceof Error)) {
-    return fallback;
-  }
-  const message = error.message
-    .replace(/^Error invoking remote method '[^']*':\s*/, "")
-    .replace(/^(?:[A-Za-z]*Error):\s*/, "")
-    .trim();
-  return message.length > 0 ? message : fallback;
-}
-
 async function openSpreadsheet(): Promise<void> {
   setUploadLoading(true);
-  setFileStatus("Checking the file opens as an Excel workbook…", "checking");
+  setFileStatus("Checking the file opens as an Excel workbook…", "pending");
 
   const selection = bridge.spreadsheet.open();
   try {
@@ -321,15 +306,15 @@ async function openSpreadsheet(): Promise<void> {
     selectedSpreadsheet = result;
     lastReport = null;
     formMessage.textContent = "";
-    formMessage.dataset.state = "idle";
-    setFileStatus("Checked — this is a readable Excel workbook.", "valid");
+    formMessage.dataset.tone = "idle";
+    setFileStatus("Checked — this is a readable Excel workbook.", "success");
     goToStage("map-columns");
   } catch (error: unknown) {
     selectedSpreadsheet = null;
     lastReport = null;
     goToStage("upload");
     setFileStatus("", "idle");
-    window.alert(friendlyMessage(error, "That file could not be opened. Try a different Excel file."));
+    notifier.failure(friendlyMessage(error, "That file could not be opened. Try a different Excel file."));
   } finally {
     setUploadLoading(false);
   }
@@ -352,20 +337,18 @@ function currentMapping(): ColumnMapping {
 }
 
 /**
- * Moves on from the mapping screen, saving the chosen columns behind it.
- *
- * The cells are read from the selects now and written in the background, so the
- * next screen opens without waiting on the store. Nothing later reads the saved
- * cells — the run takes its mapping from the selects.
+ * Move on from the mapping screen, saving the chosen columns in the background so
+ * the next screen opens without waiting on the store. The run takes its mapping
+ * from the selects, not the saved cells.
  */
 function finishMapColumns(): void {
   if (selectedSpreadsheet === null) {
     formMessage.textContent = "Upload an Excel file first.";
-    formMessage.dataset.state = "error";
+    formMessage.dataset.tone = "error";
     return;
   }
   formMessage.textContent = "";
-  formMessage.dataset.state = "idle";
+  formMessage.dataset.tone = "idle";
 
   const chosen = currentMapping();
   const { headers, headerRowNumber } = selectedSpreadsheet;
@@ -379,11 +362,9 @@ mappingForm.addEventListener("submit", (event): void => {
 });
 
 /*
- * Choosing a column offers the columns after it for the rest of the address, the
- * way typing a group's first header cell does in Settings. These selects differ
- * from those inputs in already holding a guess, so leaving a filled one alone — as
- * the dialog does — would make this do nothing. Setting the second line to "not
- * used" closes the gap it leaves, so the city moves up beside the street.
+ * Choosing a column offers the columns after it for the rest of the address.
+ * Unlike the Settings cell inputs, these selects always hold a guess, so filled
+ * ones are overwritten too; otherwise this would never do anything.
  */
 for (const { field } of addressFields) {
   mappingSelects[field].addEventListener("change", (): void => {
@@ -402,7 +383,7 @@ for (const { field } of addressFields) {
   });
 }
 
-/* USDA eligibility checks (Module 3). */
+/* USDA eligibility checks. */
 function currentCheckSelection(): EligibilityCheckSelection {
   return {
     addressValidation: checkInputs.addressValidation.checked,
@@ -411,7 +392,7 @@ function currentCheckSelection(): EligibilityCheckSelection {
   };
 }
 
-/** Keeps the USDA checkboxes and the run button in step with the selection rule. */
+/** Keep the USDA checkboxes and the run button in step with the selection rule. */
 function syncCheckControls(): void {
   const selection = currentCheckSelection();
   const controls = resolveCheckControls(selection);
@@ -424,6 +405,9 @@ function syncCheckControls(): void {
     checkInputs.area.checked = false;
   }
   setRunChecksEnabled(canRunChecks(currentCheckSelection()));
+  checksResultsLocation.textContent = resultsLocation(
+    resultColumnsFor(RESULT_COLUMNS, selectedEligibilityChecks(currentCheckSelection())),
+  );
 }
 
 function setRunChecksEnabled(enabled: boolean): void {
@@ -434,7 +418,7 @@ for (const input of [checkInputs.addressValidation, checkInputs.rural, checkInpu
   input.addEventListener("change", syncCheckControls);
 }
 
-/** Pre-selects the optional checks, then normalizes anything the dependency rule disallows. */
+/** Pre-select the optional checks, then normalize anything the dependency rule disallows. */
 function applyCheckDefaults(selection: Preferences["checkSelection"]): void {
   checkInputs.rural.checked = selection.rural;
   checkInputs.area.checked = selection.area;
@@ -449,9 +433,9 @@ function setRunChecksLoading(loading: boolean): void {
 }
 
 /**
- * Freezes navigation while a run is in flight, so the header and the step rail
- * cannot leave the run or reconfigure it mid-flight. The processing card stays
- * live so its progress keeps announcing.
+ * Freeze the header and the step rail while a run is in flight, so the run cannot
+ * be left or reconfigured. The processing card stays live so its progress keeps
+ * announcing.
  */
 function setUiFrozen(frozen: boolean): void {
   appHeader.toggleAttribute("inert", frozen);
@@ -465,8 +449,8 @@ function renderCombinedResults(validation: ValidationReport, eligibility: Eligib
   renderResultsStats([
     { value: eligibility.total, label: "Rows checked", tone: "neutral" },
     { value: deliverableCount, label: "Deliverable", tone: "good" },
-    { value: eligibility.ruralCount, label: "USDA rural", tone: "neutral" },
-    { value: eligibility.areaEligibleCount, label: "USDA eligible", tone: "neutral" },
+    { value: eligibility.ruralCount, label: "Rural designation", tone: "neutral" },
+    { value: eligibility.areaEligibleCount, label: "Area eligible", tone: "neutral" },
   ]);
 }
 
@@ -486,14 +470,14 @@ function renderResultsStats(stats: readonly ResultStat[]): void {
     value.className = "results-stat-value";
     value.textContent = String(stat.value);
     const label = document.createElement("span");
-    label.className = "results-stat-label";
+    label.className = "overline";
     label.textContent = stat.label;
     tile.append(value, label);
     resultsStats.append(tile);
   }
 }
 
-/** Fills the stepper, marking the phase now running and the ones done or still to come. */
+/** Fill the stepper, marking each phase done, running, or still to come. */
 function renderRunSteps(current: RunPhase): void {
   runSteps.replaceChildren(
     ...runPhaseSteps(activeRunPhaseList, current).map((step): HTMLLIElement => {
@@ -506,7 +490,7 @@ function renderRunSteps(current: RunPhase): void {
   );
 }
 
-/** Puts the card's words on the step now running, so it names one step at a time. */
+/** Show the card's copy for the running step, so it names one step at a time. */
 function showRunPhase(phase: RunPhase): void {
   const copy = runPhaseCopy(phase);
   processingStatus.textContent = copy.detail;
@@ -514,7 +498,7 @@ function showRunPhase(phase: RunPhase): void {
   renderRunSteps(phase);
 }
 
-/** Opens the card on the first step, with the bar animating until a count arrives. */
+/** Open the card on the first step, with the bar animating until a count arrives. */
 function startRunProgress(total: number): void {
   showRunProgress({ phase: "verifying", completed: 0, total });
 }
@@ -523,11 +507,9 @@ function showRunProgress(progress: RunProgress): void {
   const view = runProgressView(progress, activeRunPhaseList);
   showRunPhase(progress.phase);
 
-  /* A phase that has not counted a row yet has no position to show: Smarty answers
-     a whole batch of addresses in one request, so verification has nothing to
-     report until it is done. Leave the bar animating rather than parked at a
-     figure it cannot move off, and drop the value a screen reader would read as
-     precise. */
+  /* A phase with no rows counted has no position to show: Smarty answers a whole
+     batch in one request, so verification reports nothing until it is done. Keep
+     the bar animating and drop the value a screen reader would read as precise. */
   const counting = progress.completed > 0;
   processingBar.dataset.state = counting ? "determinate" : "indeterminate";
   if (counting) {
@@ -553,26 +535,19 @@ bridge.run.onProgress((progress: RunProgress): void => {
 async function performChecks(): Promise<void> {
   if (selectedSpreadsheet === null) {
     checksMessage.textContent = "Upload an Excel file first.";
-    checksMessage.dataset.state = "error";
+    checksMessage.dataset.tone = "error";
     return;
   }
   const selection = currentCheckSelection();
   if (!canRunChecks(selection)) {
-    checksMessage.textContent = "Address validation is required.";
-    checksMessage.dataset.state = "error";
+    checksMessage.textContent = "The address check is required.";
+    checksMessage.dataset.tone = "error";
     return;
   }
 
-  let credentialStatus: CredentialStatus;
-  try {
-    credentialStatus = await bridge.settings.getStatus();
-  } catch (error: unknown) {
-    checksMessage.textContent = friendlyMessage(error, "Unable to read credential status.");
-    checksMessage.dataset.state = "error";
-    return;
-  }
-  if (!credentialStatus.smartyAuthId || !credentialStatus.smartyAuthToken) {
-    window.alert("Set Smarty AUTH_ID and AUTH_TOKEN in Settings before running checks.");
+  const { blocker } = settingsPanel.credentialView();
+  if (blocker !== undefined) {
+    notifier.failure(blocker);
     showSettings(true);
     settingsPanel.openCredentials();
     return;
@@ -584,7 +559,7 @@ async function performChecks(): Promise<void> {
 
   setRunChecksLoading(true);
   checksMessage.textContent = "";
-  checksMessage.dataset.state = "idle";
+  checksMessage.dataset.tone = "idle";
   lastChecks = selectedEligibilityChecks(selection);
   activeRunPhaseList = activeRunPhases(lastChecks);
   startRunProgress(selectedSpreadsheet.rowCount);
@@ -594,8 +569,8 @@ async function performChecks(): Promise<void> {
   try {
     const mapping = currentMapping();
     const validation = await bridge.spreadsheet.validate(selectedSpreadsheet.fileName, mapping);
-    /* Moved on as soon as verification lands rather than when the next step first
-       reports, so the bar never credits reading the sheet again to the step behind it. */
+    /* Advance as soon as verification lands, not when the next phase first reports,
+       so re-reading the sheet is not credited to verification. */
     const firstUsdaPhase = activeRunPhaseList[1];
     if (firstUsdaPhase !== undefined) {
       showRunProgress({ phase: firstUsdaPhase, completed: 0, total: selectedSpreadsheet.rowCount });
@@ -614,7 +589,7 @@ async function performChecks(): Promise<void> {
     processingSection.hidden = true;
     checksSection.hidden = false;
     checksMessage.textContent = friendlyMessage(error, "The checks failed.");
-    checksMessage.dataset.state = "error";
+    checksMessage.dataset.tone = "error";
   } finally {
     setUiFrozen(false);
     setRunChecksLoading(false);
@@ -622,8 +597,8 @@ async function performChecks(): Promise<void> {
 }
 
 /*
- * The run button disables itself while a run is going, but the step rail can reach
- * "Next: choose checks" again meanwhile, which would pass a second run through.
+ * The run button disables itself during a run, but the step rail can reach "Next:
+ * choose checks" again meanwhile, which would start a second run.
  */
 const runChecks = singleFlight(performChecks);
 
@@ -658,12 +633,12 @@ function setDownloadLoading(loading: boolean): void {
   downloadLabel.textContent = loading ? "Saving" : exportButtonLabel();
 }
 
-/** Returns the button to its pre-export state; called each time results are shown. */
+/** Return the button to its pre-export state; called each time results are shown. */
 function resetExportButton(): void {
   resultsExported = false;
   downloadLabel.textContent = exportButtonLabel();
   downloadMessage.textContent = "";
-  downloadMessage.dataset.state = "idle";
+  downloadMessage.dataset.tone = "idle";
 }
 
 function columnLetter(columnNumber: number): string {
@@ -678,16 +653,9 @@ function columnLetter(columnNumber: number): string {
 
 function renderExportMessage(filePath: string): void {
   const originalCount = selectedSpreadsheet?.headers.length ?? 0;
-  const added: readonly { readonly label: string; readonly note?: string }[] = [
-    { label: "Standardized Address", note: "corrected rows only" },
-    { label: "Address Checks" },
-    { label: "Address Match Level" },
-    ...(lastChecks?.rural === true ? [{ label: "USDA Rural" }] : []),
-    ...(lastChecks?.area === true ? [{ label: "USDA Eligibility" }] : []),
-  ];
+  const added = resultColumnsFor(RESULT_COLUMNS, lastChecks ?? { rural: false, area: false });
 
   const lead = document.createElement("p");
-  lead.className = "export-message-lead";
   lead.textContent = `Saved a copy to ${filePath}. Your original file is unchanged. New columns, after your data:`;
 
   const list = document.createElement("ul");
@@ -696,7 +664,7 @@ function renderExportMessage(filePath: string): void {
     const item = document.createElement("li");
     const identifier = document.createElement("strong");
     identifier.textContent = `Column ${columnLetter(originalCount + index + 1)}`;
-    const detail = column.note === undefined ? ` — ${column.label}` : ` — ${column.label} (${column.note})`;
+    const detail = column === RESULT_COLUMNS.standardized ? ` — ${column} (corrected rows only)` : ` — ${column}`;
     item.append(identifier, document.createTextNode(detail));
     list.append(item);
   });
@@ -710,18 +678,18 @@ async function exportResults(): Promise<void> {
   }
   setDownloadLoading(true);
   downloadMessage.textContent = "";
-  downloadMessage.dataset.state = "idle";
+  downloadMessage.dataset.tone = "idle";
   try {
     const result = await bridge.results.export(selectedSpreadsheet.fileName);
     if (result.canceled || result.filePath === undefined) {
       return;
     }
     resultsExported = true;
-    downloadMessage.dataset.state = "success";
+    downloadMessage.dataset.tone = "success";
     renderExportMessage(result.filePath);
   } catch (error: unknown) {
     downloadMessage.textContent = friendlyMessage(error, "Could not save the results file.");
-    downloadMessage.dataset.state = "error";
+    downloadMessage.dataset.tone = "error";
   } finally {
     setDownloadLoading(false);
   }
@@ -732,10 +700,10 @@ async function openExportedFile(): Promise<void> {
     return;
   }
   try {
-    await bridge.results.reveal(selectedSpreadsheet.fileName);
+    await bridge.results.open(selectedSpreadsheet.fileName);
   } catch (error: unknown) {
     downloadMessage.textContent = friendlyMessage(error, "Could not open the exported file.");
-    downloadMessage.dataset.state = "error";
+    downloadMessage.dataset.tone = "error";
   }
 }
 
@@ -743,13 +711,14 @@ downloadResultsButton.addEventListener("click", (): void => {
   void (resultsExported ? openExportedFile() : exportResults());
 });
 
-/*
- * Startup fails before any view is on screen, so the only surface that is certainly
- * visible is a dialog.
- */
+/* Startup fails before any view is on screen, so only a dialog is certain to be seen. */
 function reportStartupError(error: unknown): void {
-  window.alert(friendlyMessage(error, "Unable to start vibeCheck."));
+  notifier.failure(friendlyMessage(error, "Unable to start vibeCheck."));
 }
+
+const homeCredentialNotice = getRequiredElement<HTMLElement>("#home-credential-notice");
+const homeCredentialNoticeText = getRequiredElement<HTMLElement>("#home-credential-notice-text");
+const homeStartButton = getRequiredElement<HTMLButtonElement>("#home-start");
 
 const settingsPanel = createSettingsPanel({
   getPreferences: () => preferences,
@@ -763,6 +732,14 @@ const settingsPanel = createSettingsPanel({
     if (selectedSpreadsheet !== null) {
       renderMapping(selectedSpreadsheet);
     }
+  },
+  notifier,
+  onCredentialStateChange: ({ blocker, homeNotice, tone }): void => {
+    homeCredentialNoticeText.textContent = homeNotice ?? "";
+    homeCredentialNotice.hidden = homeNotice === undefined;
+    homeCredentialNotice.dataset.tone = tone;
+    /* Held back until the key can run checks; the notice beside it says why. */
+    homeStartButton.disabled = blocker !== undefined;
   },
 });
 
@@ -804,13 +781,15 @@ function renderHomeSteps(): void {
     item.className = "home-step";
 
     const number = document.createElement("span");
-    number.className = "home-step-number";
+    number.className = "step-badge";
     number.textContent = String(index + 1);
 
     const title = document.createElement("h2");
+    title.className = "subhead";
     title.textContent = step.label;
 
     const summary = document.createElement("p");
+    summary.className = "copy";
     summary.textContent = step.summary;
 
     item.append(number, title, summary);
@@ -821,31 +800,19 @@ function renderHomeSteps(): void {
 
 getRequiredElement<HTMLButtonElement>("#home-link").addEventListener("click", (): void => {
   showView("home");
-  getRequiredElement<HTMLButtonElement>("#home-start").focus();
+  homeStartButton.focus();
 });
 
-getRequiredElement<HTMLButtonElement>("#home-start").addEventListener("click", (): void => {
-  /* Smarty credentials are required before any run, so send a partner who has not
-     set them straight to the credentials screen rather than into an upload that
-     would only fail. */
-  void bridge.settings
-    .getStatus()
-    .then((status): void => {
-      settingsPanel.showCredentialStatus(status);
-      if (!status.smartyAuthId || !status.smartyAuthToken) {
-        showSettings(true);
-        settingsPanel.openCredentials();
-        return;
-      }
-      showView("workflow");
-      uploadExcelButton.focus();
-    })
-    .catch(reportStartupError);
+/* Only enabled once the key can run checks, so it goes straight to the upload. */
+homeStartButton.addEventListener("click", (): void => {
+  showView("workflow");
+  uploadExcelButton.focus();
 });
 
-getRequiredElement<HTMLAnchorElement>("#home-settings-link").addEventListener("click", (event): void => {
+getRequiredElement<HTMLAnchorElement>("#home-credential-notice-link").addEventListener("click", (event): void => {
   event.preventDefault();
   showSettings(true);
+  settingsPanel.openCredentials();
 });
 
 settingsToggle.addEventListener("click", (): void => showSettings(settingsView.hidden !== false));
@@ -862,7 +829,7 @@ async function initialize(): Promise<void> {
     bridge.preferences.get(),
     bridge.preferences.getSystemTheme(),
   ]);
-  settingsPanel.showCredentialStatus(status);
+  settingsPanel.showStoredCredentials(status);
   preferences = storedPreferences;
   systemTheme = resolvedSystemTheme;
   applyAppearance();
@@ -871,6 +838,8 @@ async function initialize(): Promise<void> {
   renderHomeSteps();
   applyCheckDefaults(preferences.checkSelection);
   showView("home");
+  /* Not awaited: the home page is usable while Smarty answers. */
+  void settingsPanel.checkCredentials();
 }
 
 void initialize().catch(reportStartupError);

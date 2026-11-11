@@ -6,21 +6,18 @@ import { mapWithConcurrency } from "../../core/run/concurrency.js";
 import { coordinateKey } from "../../core/run/geocode-quality.js";
 
 /**
- * Comma-free `layerDefs` selecting every rural-criteria layer with no attribute
- * filter, so one service-level query returns a per-layer intersect count. Built
- * once from the configured layer ids.
+ * `layerDefs` selecting every rural-criteria layer with no attribute filter, so
+ * one service-level query returns a per-layer intersect count.
  */
 const ruralLayerDefs = JSON.stringify(Object.fromEntries(USDA_RURAL_LAYER_IDS.map((id) => [id, ""])));
 
 /**
- * Determines USDA rural designation by intersecting each point against the five
- * rural-criteria layers. A point in ANY layer is rural; the matched layers are
+ * Determines USDA rural designation by intersecting each point with the
+ * rural-criteria layers. A point in any layer is rural; the matched layers are
  * reported as human-readable criteria.
  *
- * The five layers are asked for in one service-level `layerDefs` query rather
- * than one request per layer, so each point costs a single request. The batch is
- * still paced a few points at a time to keep a large sheet from flooding a free
- * public service.
+ * All layers are asked for in one `layerDefs` query per point, and points are
+ * paced a few at a time so a large sheet does not flood a free public service.
  */
 export class UsdaRuralZoneMapChecker implements RuralZoneChecker {
   public constructor(private readonly http: HttpGetClient) {}
@@ -29,10 +26,8 @@ export class UsdaRuralZoneMapChecker implements RuralZoneChecker {
     rows: readonly LocatedRow[],
     onProgress?: ProgressReporter,
   ): Promise<ReadonlyMap<number, CheckOutcome<RuralResult>>> {
-    /* Rows at the same coordinate share one in-flight lookup, so a duplicate
-       never issues its own request and takes the first row's outcome — including
-       a failure, which is therefore reported alike rather than retried. Scoped to
-       this call, so there is no state to invalidate between runs. */
+    /* Rows at the same coordinate share one in-flight lookup and its outcome,
+       failures included. Scoped to this call, so nothing outlives the run. */
     const byCoordinate = new Map<string, Promise<RuralResult>>();
     const outcomes = await mapWithConcurrency(
       rows,
@@ -86,9 +81,8 @@ export class UsdaRuralZoneMapChecker implements RuralZoneChecker {
  * Per-layer intersect counts from a `layerDefs` query, keyed by layer id.
  *
  * ArcGIS reports failures as HTTP 200 with an `error` field, which the transport
- * retry layer never sees, so it is caught here. A response without the `layers`
- * array is treated as an error rather than "not rural": a malformed answer must
- * not quietly read as a negative result.
+ * never sees, so it is caught here. A response without `layers` is an error, not
+ * "not rural": a malformed answer must not read as a negative result.
  */
 function layerCounts(payload: unknown): ReadonlyMap<number, number> {
   if (typeof payload !== "object" || payload === null) {

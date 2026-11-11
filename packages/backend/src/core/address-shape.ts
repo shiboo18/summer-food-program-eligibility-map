@@ -29,15 +29,12 @@ const zipPattern = /^\d{5}(-\d{4})?$/;
 const zipMissingLeadingZeroPattern = /^\d{4}$/;
 
 /**
- * Reads one row's mapped cell text as a US address.
+ * Read one row's mapped cell text as a US address.
  *
- * A row is blank when every mapped column is empty, which is a gap in the sheet
- * rather than a fault. Otherwise every column must be filled and must look like
- * what it is meant to be — a check that keeps a mis-mapped column from being sent
- * off as an address and coming back unverifiable row after row.
- *
- * Only the first problem found is reported: the partner fixes one thing per row,
- * and a missing column is named before the shape of what is there.
+ * A row is blank when every mapped column is empty: a gap in the sheet, not a
+ * fault. Otherwise every column must be filled and look like what it should be,
+ * so a mis-mapped column is caught here instead of failing at Smarty row after
+ * row. Only the first problem is reported, and a missing column comes first.
  */
 export function parseAddress(cells: {
   readonly line1: string;

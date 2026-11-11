@@ -2,17 +2,21 @@ import { getRequiredElement } from "../dom.js";
 
 export interface Dialog {
   /**
-   * Shows the dialog. Pass the control that asked for it when that is not the
+   * Show the dialog. Pass the control that asked for it when that is not the
    * registered trigger, so closing returns focus there rather than to a control
-   * on a screen the user is no longer looking at.
+   * on a screen the user has left.
    */
   open(returnFocusTo?: HTMLElement): void;
+  /** Hide the dialog, returning focus to whatever opened it. */
+  close(): void;
 }
 
 export interface DialogOptions {
   /** Accessible name for the generated close button. */
   readonly closeLabel: string;
   readonly onOpen?: () => void;
+  /** Runs however the dialog closes: its button, Escape, the backdrop, or `close`. */
+  readonly onClose?: () => void;
 }
 
 const dialogs: Array<{ readonly overlay: HTMLElement; readonly close: () => void }> = [];
@@ -38,7 +42,6 @@ function keepFocusInside(event: KeyboardEvent, overlay: HTMLElement): void {
   }
 }
 
-/* One key handler serves every dialog, rather than one listener per dialog. */
 document.addEventListener("keydown", (event): void => {
   const open = dialogs.find(({ overlay }) => !overlay.hidden);
   if (open === undefined) {
@@ -56,7 +59,7 @@ const svgNamespace = "http://www.w3.org/2000/svg";
 function createCloseButton(label: string): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "gear-button welcome-close";
+  button.className = "gear-button dialog-close";
   button.setAttribute("aria-label", label);
   button.title = label;
 
@@ -80,7 +83,7 @@ function createCloseButton(label: string): HTMLButtonElement {
 }
 
 /**
- * Wires a modal: its trigger, generated close button, backdrop click, Escape,
+ * Wire a modal: its trigger, generated close button, backdrop click, Escape,
  * and focus trap. The markup holds only the dialog's own content.
  */
 export function createDialog(overlayId: string, trigger: HTMLButtonElement, options: DialogOptions): Dialog {
@@ -88,6 +91,7 @@ export function createDialog(overlayId: string, trigger: HTMLButtonElement, opti
   let returnFocusTo: HTMLElement = trigger;
   const close = (): void => {
     overlay.hidden = true;
+    options.onClose?.();
     returnFocusTo.focus();
   };
   const open = (opener: HTMLElement = trigger): void => {
@@ -98,7 +102,11 @@ export function createDialog(overlayId: string, trigger: HTMLButtonElement, opti
 
   const closeButton = createCloseButton(options.closeLabel);
   closeButton.addEventListener("click", close);
-  overlay.querySelector(".welcome-card")?.prepend(closeButton);
+  /* A "Done" button in the markup closes its dialog without wiring of its own. */
+  for (const done of overlay.querySelectorAll<HTMLButtonElement>("[data-dialog-close]")) {
+    done.addEventListener("click", close);
+  }
+  overlay.querySelector(".dialog-card")?.prepend(closeButton);
 
   /* Wrapped: a click listener would otherwise pass its event as the opener. */
   trigger.addEventListener("click", (): void => open());
@@ -107,8 +115,7 @@ export function createDialog(overlayId: string, trigger: HTMLButtonElement, opti
       close();
     }
   });
-  /* Closing is driven by Escape, the backdrop, and the close button, never by a caller. */
   dialogs.push({ overlay, close });
 
-  return { open };
+  return { open, close };
 }

@@ -5,6 +5,7 @@ import ExcelJS from "exceljs";
 
 import { HEADER_ROW_SCAN_LIMIT } from "../../config/constants.js";
 import { parseAddress } from "../../core/address-shape.js";
+import { resultColumnsFor } from "../../core/eligibility-checks.js";
 import { findHeaderRow, isDataRow, type HeaderRow } from "../../core/sheet-shape.js";
 import type { SpreadsheetReader, SpreadsheetWriter } from "../../contracts.js";
 import type {
@@ -23,7 +24,7 @@ const badFill = "FFF6D6D6";
 const neutralFill = "FFF2F2F2";
 const correctedFill = "FFFCE9C8";
 
-/** Reads and updates Excel workbooks with ExcelJS so no custom spreadsheet parsing is required. */
+/** Reads and annotates Excel workbooks with ExcelJS. */
 export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWriter {
   public async readSummary(filePath: string): Promise<SpreadsheetSummary> {
     const sheet = await loadFirstSheet(filePath);
@@ -73,13 +74,7 @@ export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWri
   ): Promise<void> {
     const sheet = await loadFirstSheet(filePath);
     const { columns } = options;
-    const wanted = [
-      columns.standardized,
-      columns.deliverability,
-      columns.location,
-      ...(options.includeRural ? [columns.rural] : []),
-      ...(options.includeArea ? [columns.area] : []),
-    ];
+    const wanted = resultColumnsFor(columns, { rural: options.includeRural, area: options.includeArea });
 
     const { rowNumber: headerRowNumber, headers } = requireHeaderRow(sheet);
     const columnAt = new Map<string, number>();
@@ -183,12 +178,10 @@ async function loadFirstSheet(filePath: string): Promise<ExcelJS.Worksheet> {
 }
 
 /**
- * Checks the file is there and readable before it is parsed.
+ * Check the file exists and is readable before it is parsed.
  *
- * The three failures call for different actions — find the file, fix its
- * permissions, or export it as .xlsx — so they are reported apart. This is checked
- * here rather than inferred from the parser's failure, which reports a missing file
- * and a corrupt one alike.
+ * A missing file, a permissions problem, and a non-workbook need different fixes,
+ * but the parser reports them alike, so the first two are checked here.
  *
  * @throws Error naming the failure in the partner's terms.
  */

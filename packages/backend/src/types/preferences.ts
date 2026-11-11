@@ -1,5 +1,3 @@
-/** The shape of stored user preferences. Parsing and file access live in preferences-store.ts. */
-
 export const themeModes = ["system", "light", "dark"] as const;
 export type ThemeMode = (typeof themeModes)[number];
 
@@ -15,14 +13,11 @@ export const mappingFields = [
 /**
  * The header cell the user pinned for each field, such as `A1`. Cells are cached
  * rather than column names because names differ between files while the column
- * position usually does not. Every field is optional.
+ * position usually does not.
  */
 export type CachedColumnMapping = Readonly<Partial<Record<(typeof mappingFields)[number], string>>>;
 
-/**
- * The optional USDA checks the user last ran. Address validation is always
- * required, so it is not cached: it cannot be turned off.
- */
+/** The optional USDA checks the user last ran. Address validation always runs, so it is not cached. */
 export interface CachedCheckSelection {
   readonly rural: boolean;
   readonly area: boolean;

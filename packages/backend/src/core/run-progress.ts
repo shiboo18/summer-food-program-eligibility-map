@@ -6,15 +6,15 @@ export const runPhases: readonly RunPhase[] = ["verifying", "rural", "area"];
 
 /** The partner-facing name of each phase, shown as a step in the run screen. */
 const phaseLabels: Readonly<Record<RunPhase, string>> = {
-  verifying: "Address Verification",
-  rural: "USDA Rural",
-  area: "USDA Eligibility",
+  verifying: "Address check",
+  rural: "USDA rural designation",
+  area: "USDA area eligibility",
 };
 
 /**
- * The phases a run will actually pass through, given the checks chosen. Address
- * verification always runs; each USDA phase runs only when its check is selected,
- * so the bar and the stepper cover the real work rather than every possible step.
+ * Return the phases a run will pass through, given the checks chosen. Address
+ * verification always runs; each USDA phase only when its check is selected, so
+ * the bar and the stepper cover the real work.
  */
 export function activeRunPhases(checks: EligibilityChecks): readonly RunPhase[] {
   return [
@@ -42,14 +42,12 @@ const phaseVerbs: Readonly<Record<RunPhase, string>> = {
 };
 
 /**
- * Reads one report from a run as a position on the bar.
+ * Read one report from a run as a position on the bar.
  *
- * The bar is shared equally over `active` — the phases this run will actually
- * pass through — so it advances the whole way whichever checks were chosen
- * rather than reserving room for a phase that never runs. A phase with no rows to
- * get through counts as finished, and a count outside its total is held to its
- * share's ends, so an over- or under-count cannot send the bar backwards or past
- * the end.
+ * The bar is shared equally over the `active` phases, so it fills whichever
+ * checks were chosen. A phase with no rows counts as finished, and a count
+ * outside its total is clamped to its share, so the bar never moves backwards or
+ * past the end.
  */
 export function runProgressView(progress: RunProgress, active: readonly RunPhase[]): RunProgressView {
   const share = active.length === 0 ? 1 : 1 / active.length;
@@ -77,10 +75,9 @@ export interface RunStep {
 }
 
 /**
- * The run stepper: every phase in order, each marked off (not part of this run),
- * done, running, or pending, given the phases this run will pass through and the
- * one now running. A phase this run skips reads "off" so the partner sees it was
- * not part of the work rather than stuck.
+ * Return the run stepper: every phase in order, marked off, done, running, or
+ * pending. A phase this run skips reads "off" so the partner sees it was not part
+ * of the work rather than stuck.
  */
 export function runPhaseSteps(active: readonly RunPhase[], current: RunPhase): readonly RunStep[] {
   const currentIndex = active.indexOf(current);
@@ -123,7 +120,7 @@ const phaseCopy: Readonly<Record<RunPhase, RunPhaseCopy>> = {
   },
 };
 
-/** What the screen should read while `phase` is the step running. */
+/** Return what the run screen reads while `phase` is running. */
 export function runPhaseCopy(phase: RunPhase): RunPhaseCopy {
   return phaseCopy[phase];
 }

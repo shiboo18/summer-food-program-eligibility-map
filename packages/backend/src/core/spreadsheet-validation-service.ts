@@ -10,35 +10,29 @@ export interface SpreadsheetValidationResult {
   readonly locations: ReadonlyMap<number, ValidatedLocation>;
   /** Per-row verification outcome, keyed by row number, for the results annotation. */
   readonly verifications: ReadonlyMap<number, RowVerification>;
-  /**
-   * The rows parsed from the workbook, so the eligibility pass can reuse them
-   * instead of reading and parsing the same file a second time.
-   */
+  /** The parsed rows, so the eligibility pass need not read the file again. */
   readonly addressRows: AddressRowsResult;
 }
 
 /** One pass over a partner's workbook: where to read it from, and how. */
 export interface SpreadsheetValidationRequest {
-  /** Where the workbook lives on disk, used to read it. */
   readonly filePath: string;
   readonly mapping: ColumnMapping;
-  /** What to call the workbook on the report the partner reads. */
+  /** The workbook's name on the partner's report. */
   readonly fileName: string;
   /**
-   * Called as validation goes, counted over every data row the sheet holds. A row
-   * skipped while reading is decided the moment it is read, so it counts as done
-   * before the first address reaches Smarty.
+   * Called as validation goes, counted over every data row in the sheet. Rows
+   * skipped while reading count as done before the first address reaches Smarty.
    */
   readonly onProgress?: ProgressReporter;
 }
 
 /**
  * Validates every mapped spreadsheet row and reports the rows that need
- * attention. The partner's workbook is only ever read: Smarty's suggested
- * address reaches them as the standardized-address column of the results copy
- * they download, never by overwriting what they typed. Also returns the Smarty
- * coordinate found for each row so the eligibility pipeline can reuse it
- * instead of calling Smarty a second time.
+ * attention. The workbook is only read: Smarty's suggested address reaches the
+ * partner as a column in the results copy, never by overwriting what they typed.
+ * Also returns each row's Smarty coordinate so the eligibility pass need not ask
+ * Smarty again.
  */
 export class SpreadsheetValidationService {
   public constructor(
@@ -83,8 +77,7 @@ export class SpreadsheetValidationService {
             precision: result.location.precision,
             matchedAddress: formatAddress(result.normalizedAddress ?? row.address),
           },
-          /* Carried so the geocoder looks up the corrected address rather than
-             whatever the partner typed. */
+          /* So the geocoder looks up the corrected address, not what the partner typed. */
           ...(result.normalizedAddress === undefined ? {} : { standardizedAddress: result.normalizedAddress }),
         });
       }

@@ -13,12 +13,11 @@ export interface HeaderRow {
 }
 
 /**
- * Finds the row holding the column names among the first rows of a sheet.
+ * Find the row holding the column names among the first rows of a sheet.
  *
- * Partners' exports often open with a legend or title — a row or two with one or
- * two filled cells — above the real names, so the top row cannot be assumed. The
- * name row is taken to be the first one filled to [HEADER_ROW_MIN_DENSITY] of the
- * widest row scanned; a legend falls far short of that. A sheet whose name row is
+ * Partners' exports often open with a sparse legend or title above the names, so
+ * the top row cannot be assumed. The name row is the first filled to
+ * [HEADER_ROW_MIN_DENSITY] of the widest row scanned. A sheet whose name row is
  * emptier than its data rows by that margin is not recognised.
  *
  * @param rows Leading rows as positional cell text, blanks included.
@@ -43,11 +42,9 @@ export function findHeaderRow(rows: readonly (readonly string[])[]): HeaderRow |
 }
 
 /**
- * Whether a row below the names looks like a record rather than sheet furniture.
- *
- * A column filled to the bottom of the sheet with one repeated value — a stray
- * fill-down — would otherwise make every row of a mostly empty sheet count as
- * data, so a record has to fill at least [MIN_DATA_ROW_CELLS] cells.
+ * Return whether a row below the names is a record rather than sheet furniture.
+ * A stray fill-down would otherwise make every row count as data, so a record
+ * must fill at least [MIN_DATA_ROW_CELLS] cells.
  */
 export function isDataRow(cells: readonly string[]): boolean {
   return cells.filter((cell) => cell.trim().length > 0).length >= MIN_DATA_ROW_CELLS;

@@ -1,77 +1,11 @@
-/* Calm white + light-orange theme. Dark mode uses warm charcoal surfaces. */
-@font-face {
-  font-family: "Manrope";
-  font-style: normal;
-  font-weight: 200 800;
-  font-display: swap;
-  src: url("./fonts/manrope-latin-wght-normal.woff2") format("woff2-variations");
-}
+/*
+ * Layout and components. Every value comes from theme.css. Shared components
+ * (text roles, panels, fields, buttons, actions, messages, status lines, check
+ * rows, step badges) are styled once here and reused by every view, so the same
+ * kind of thing looks the same wherever it appears.
+ */
 
-:root {
-  --radius-lg: 18px;
-  --radius-md: 11px;
-  --radius-sm: 8px;
-  --fade: 220ms ease;
-  font-family: "Manrope", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-}
-
-html[data-theme="light"] {
-  --page: #fffaf6;
-  --page-accent: #ffeadb;
-  --surface: #ffffff;
-  --surface-soft: #fff5ed;
-  --border: #f0ded1;
-  --border-strong: #dfc3b1;
-  --text: #3d332e;
-  --text-soft: #786a62;
-  --text-faint: #9b8c84;
-  --accent: #efa06f;
-  --accent-strong: #d97d49;
-  --accent-text: #382016;
-  --success: #46765a;
-  --danger: #aa5437;
-  --shadow: rgba(92, 61, 43, 0.08);
-  --overlay: rgba(255, 248, 242, 0.88);
-  --focus: rgba(217, 125, 73, 0.38);
-}
-
-html[data-theme="dark"] {
-  --page: #171411;
-  --page-accent: #2a211b;
-  --surface: #211c18;
-  --surface-soft: #2a231e;
-  --border: #3c312a;
-  --border-strong: #58473c;
-  --text: #f3ebe5;
-  --text-soft: #c0b2a9;
-  --text-faint: #93867e;
-  --accent: #f2a572;
-  --accent-strong: #ffba89;
-  --accent-text: #29180f;
-  --success: #86c69b;
-  --danger: #f0a083;
-  --shadow: rgba(0, 0, 0, 0.28);
-  --overlay: rgba(23, 20, 17, 0.9);
-  --focus: rgba(255, 186, 137, 0.44);
-}
-
-html[data-contrast="high"][data-theme="light"] {
-  --text: #201814;
-  --text-soft: #493b34;
-  --border: #c39f89;
-  --border-strong: #9b6f55;
-  --accent-strong: #a94f1d;
-}
-
-html[data-contrast="high"][data-theme="dark"] {
-  --text: #ffffff;
-  --text-soft: #e4d9d1;
-  --border: #796457;
-  --border-strong: #a48877;
-}
-
+/* Base. */
 * {
   box-sizing: border-box;
 }
@@ -86,12 +20,14 @@ body {
   min-height: 100%;
 }
 
+
 body {
   min-width: 320px;
   min-height: 100vh;
   color: var(--text);
   background: linear-gradient(145deg, var(--surface) 0%, var(--page) 68%, var(--page-accent) 100%) fixed;
-  transition: color var(--fade), background var(--fade);
+  font-size: var(--font-size-body);
+  transition: color var(--motion-fade), background var(--motion-fade);
 }
 
 button,
@@ -111,25 +47,415 @@ h1,
 h2,
 h3,
 h4,
-p {
-  margin-top: 0;
+p,
+ol,
+ul {
+  margin: 0;
 }
 
-/* A column at least as tall as the window, so the header and the footer are the
-   first and last rows of every view and only the middle grows with content. */
+/* Text roles. */
+.page-title {
+  font-size: var(--font-size-title);
+  font-weight: 300;
+  line-height: 1.08;
+  letter-spacing: -0.035em;
+}
+
+.section-title {
+  font-size: var(--font-size-section);
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.subhead {
+  font-size: var(--font-size-body);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.copy {
+  color: var(--text-soft);
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+}
+
+.overline {
+  color: var(--text-faint);
+  font-size: var(--font-size-sm);
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.eyebrow {
+  color: var(--accent-strong);
+}
+
+.text-link {
+  color: var(--accent-strong);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+/* A card that holds one step, one settings area, or one dialog. */
+.panel {
+  padding: var(--space-6);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  animation: gentle-fade var(--motion-fade);
+}
+
+/* Fields: a label over its control, both body-sized. Fields sharing a row line
+   their controls up even when one label wraps. */
+.field {
+  display: grid;
+  align-content: space-between;
+  gap: var(--space-2);
+}
+
+.field-label {
+  color: var(--text);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+}
+
+.field-optional {
+  color: var(--text-soft);
+  font-weight: 400;
+}
+
+.input,
+.select {
+  width: 100%;
+  padding: 11px 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: var(--font-size-body);
+  transition: border-color var(--motion-fade), background var(--motion-fade);
+}
+
+.input::placeholder {
+  color: var(--text-faint);
+}
+
+/* Buttons. One size everywhere; disabled is read from the element itself. */
+.primary-button,
+.secondary-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 11px 18px;
+  border-radius: var(--radius-sm);
+  font-size: var(--font-size-body);
+  font-weight: 700;
+  cursor: pointer;
+  transition: color var(--motion-fade), border-color var(--motion-fade), background var(--motion-fade);
+}
+
+.primary-button {
+  border: 0;
+  color: var(--accent-text);
+  background: var(--accent);
+  box-shadow: var(--shadow-accent);
+}
+
+.primary-button:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+/* A warm tint lifts it off the panel without competing with the main button. */
+.secondary-button {
+  border: 1px solid color-mix(in srgb, var(--accent-strong) 40%, var(--border-strong));
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  text-decoration: none;
+}
+
+.secondary-button:hover:not(:disabled) {
+  border-color: var(--accent-strong);
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface));
+}
+
+.primary-button:disabled {
+  color: var(--text-faint);
+  background: var(--surface-soft);
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* A row of actions ends its panel or dialog: right-aligned, the main one last.
+   The inline variant sits a button beside its status line. */
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.actions--inline {
+  justify-content: flex-start;
+  gap: var(--space-3);
+}
+
+/* One width for every button in an inline row, label at the left, so a column
+   of them reads as an aligned set rather than a ragged edge. */
+.actions--inline > .primary-button,
+.actions--inline > .secondary-button {
+  width: min(100%, 18rem);
+  justify-content: flex-start;
+}
+
+/* A block message: why something did not work, a notice, or a result. It takes
+   no room until there is something to say. */
+.message {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent-strong);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  background: var(--surface);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.message:empty {
+  display: none;
+}
+
+.message[data-tone="success"] {
+  border-color: var(--success);
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 10%, transparent);
+}
+
+.message[data-tone="error"] {
+  border-color: var(--danger);
+  color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 10%, transparent);
+}
+
+/* A coach mark: a short pointer under a field when what was typed looks like a
+   common mistake, with a notch pointing up at the field. Advice, never a block. */
+.coach-mark {
+  position: relative;
+  margin-top: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--accent-strong);
+  border-radius: var(--radius-md);
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+}
+
+.coach-mark::before {
+  position: absolute;
+  top: -7px;
+  left: var(--space-5);
+  width: 12px;
+  height: 12px;
+  border-top: 1px solid var(--accent-strong);
+  border-left: 1px solid var(--accent-strong);
+  background: inherit;
+  content: "";
+  transform: rotate(45deg);
+}
+
+/* A one-line status beside or under a control. Colour carries the tone and the
+   words carry the meaning, so no glyph is needed. */
+.status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-soft);
+  font-size: var(--font-size-body);
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.status[data-tone="pending"] {
+  font-weight: 500;
+}
+
+.status[data-tone="success"] {
+  color: var(--success);
+}
+
+.status[data-tone="warning"] {
+  color: var(--accent-strong);
+}
+
+.status[data-tone="error"] {
+  color: var(--danger);
+}
+
+/* A checkbox row: a box sized to the text, a title, and a description under it. */
+.check-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  color: var(--text-soft);
+}
+
+.check-row input {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  margin: 3px 0 0;
+  accent-color: var(--accent-strong);
+}
+
+.check-row strong,
+.check-row small {
+  display: block;
+  font-size: var(--font-size-body);
+  line-height: 1.5;
+}
+
+.check-row strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.check-row small {
+  margin-top: 2px;
+  color: var(--text-soft);
+  font-weight: 400;
+}
+
+.check-list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* A disclosure: a one-line summary that opens to the detail, such as the privacy
+   note or the USDA check help. */
+.disclosure {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-soft);
+}
+
+.disclosure summary {
+  cursor: pointer;
+}
+
+.disclosure[open] summary {
+  margin-bottom: var(--space-2);
+}
+
+.disclosure[open] > :not(summary) {
+  animation: gentle-fade var(--motion-reveal);
+}
+
+.disclosure p + p,
+.disclosure p + ul,
+.disclosure ul + p {
+  margin-top: var(--space-2);
+}
+
+.disclosure-list {
+  display: grid;
+  gap: var(--space-1);
+  padding-left: 18px;
+}
+
+.disclosure-list strong {
+  color: var(--text);
+}
+
+/* A numbered circle for a step, on the home page and in the steps list. */
+.step-badge {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-soft);
+  font-size: var(--font-size-body);
+  font-weight: 700;
+}
+
+.loading-spinner {
+  width: 15px;
+  height: 15px;
+  flex: none;
+  border: 2px solid var(--border-strong);
+  border-top-color: var(--accent-strong);
+  border-radius: 50%;
+  animation: spinner-rotate var(--motion-spin) infinite;
+}
+
+/* Shell. A column at least as tall as the window, so the header and footer are
+   the first and last rows of every view and only the middle grows. */
+/* The shell fills the window less a margin that grows with it, up to
+   --shell-max. It sets the page's only width: text, panels and tiles fill
+   their container, so they share one right edge. */
 .app-shell {
+  --shell-max: 1440px;
+  --shell-gutter: clamp(14px, 5vw, 80px);
   display: flex;
   flex-direction: column;
-  width: min(1060px, calc(100% - 48px));
+  width: min(var(--shell-max), 100% - 2 * var(--shell-gutter));
   min-height: 100vh;
   margin: 0 auto;
   padding: 28px 0 22px;
 }
 
+/* The empty space around a view is split 3:7 above and below it, so a short
+   view sits about a third of the way down, where the eye expects it, rather than
+   stuck to the header or floating at the exact middle. A view taller than the
+   window has no space to split and simply flows. */
+.app-shell::before,
+.app-shell::after {
+  content: "";
+}
+
+.app-shell::before {
+  order: 1;
+  flex: 3 1 0;
+}
+
+.app-header {
+  order: 0;
+}
+
+.home-view,
+.workspace,
+.settings-view {
+  order: 2;
+}
+
+.app-shell::after {
+  order: 3;
+  flex: 7 1 0;
+}
+
+.app-footer {
+  order: 4;
+}
+
 .app-header {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: var(--space-4);
   min-height: 42px;
 }
 
@@ -137,153 +463,24 @@ p {
   display: flex;
   align-items: center;
   gap: 11px;
-  padding: 4px 6px 4px 4px;
+  padding: var(--space-1) 6px var(--space-1) var(--space-1);
   border: 0;
   border-radius: var(--radius-md);
   background: none;
   cursor: pointer;
   text-align: left;
-  transition: background var(--fade);
+  transition: background var(--motion-fade);
 }
 
 .product-lockup:hover {
   background: var(--surface-soft);
 }
 
-.home-view {
-  max-width: 100%;
-  padding: 10px 2px 12px;
-  animation: gentle-fade var(--fade);
-}
-
-.home-view h1,
-.home-copy {
-  max-width: 100%;
-}
-
-.home-view h1 {
-  margin-bottom: 10px;
-  font-size: clamp(1.7rem, 3.4vw, 2.2rem);
-  font-weight: 300;
-  line-height: 1.08;
-  letter-spacing: -0.035em;
-}
-
-.home-copy {
-  margin-bottom: 16px;
-  color: var(--text-soft);
-  font-size: 0.92rem;
-  line-height: 1.55;
-}
-
-.text-link {
-  color: var(--accent-strong);
-  font-weight: 600;
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-
-.text-link:hover {
-  text-decoration: underline;
-}
-
-/* Inside a sentence, colour alone reads as emphasis rather than as a control. */
-.intro-copy .text-link {
-  text-decoration: underline;
-}
-
-.privacy-note {
-  margin-bottom: 16px;
-  padding: 10px 16px;
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--accent-strong);
-  border-radius: var(--radius-md);
-  background: var(--surface-soft);
-}
-
-.privacy-note-summary {
-  cursor: pointer;
-  font-weight: 600;
-  color: var(--text);
-}
-
-.privacy-note[open] .privacy-note-summary {
-  margin-bottom: 10px;
-}
-
-.privacy-note-lead {
-  margin: 0 0 8px;
-  color: var(--text-soft);
-  font-size: 0.85rem;
-}
-
-.privacy-note-detail {
-  margin: 0 0 6px;
-  color: var(--text-soft);
-  font-size: 0.85rem;
-}
-
-.privacy-providers {
-  margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 4px;
-  color: var(--text-soft);
-  font-size: 0.85rem;
-}
-
-.privacy-providers strong {
-  color: var(--text);
-}
-
-.home-steps {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(max(200px, calc(50% - 6px)), 1fr));
-  gap: 12px;
-  margin: 0 0 16px;
-  padding: 0;
-  list-style: none;
-}
-
-.home-step {
-  padding: 14px 20px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: 0 10px 26px var(--shadow);
-}
-
-.home-step-number {
-  display: grid;
-  width: 28px;
-  height: 28px;
-  margin-bottom: 8px;
-  place-items: center;
-  border-radius: 50%;
-  color: var(--accent-text);
-  background: var(--accent);
-  font-size: 0.78rem;
-  font-weight: 700;
-}
-
-.home-step h2 {
-  margin-bottom: 4px;
-  font-size: 0.95rem;
-  font-weight: 500;
-}
-
-.home-step p {
-  margin: 0;
-  color: var(--text-soft);
-  font-size: 0.78rem;
-  line-height: 1.45;
-}
-
 .app-mark {
   width: 42px;
   height: 42px;
   flex: 0 0 42px;
-  border-radius: 11px;
+  border-radius: var(--radius-md);
 }
 
 .product-brand {
@@ -293,7 +490,7 @@ p {
 
 .product-name {
   display: block;
-  font-size: 1.05rem;
+  font-size: var(--font-size-lead);
   font-weight: 500;
   letter-spacing: -0.025em;
 }
@@ -303,13 +500,8 @@ p {
   flex-wrap: wrap;
   align-items: baseline;
   gap: 3px 7px;
-}
-
-.cobrand-primary,
-.cobrand-secondary {
-  font-size: 0.68rem;
+  font-size: var(--font-size-sm);
   font-weight: 500;
-  letter-spacing: -0.01em;
 }
 
 .cobrand-secondary {
@@ -329,14 +521,6 @@ p {
   transform: translateY(-50%);
 }
 
-.cobrand-connector {
-  color: var(--text-faint);
-  font-size: 0.65rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}
-
 .gear-button {
   display: grid;
   width: 40px;
@@ -349,7 +533,7 @@ p {
   color: var(--text-soft);
   background: var(--surface);
   cursor: pointer;
-  transition: color var(--fade), border-color var(--fade), background var(--fade);
+  transition: color var(--motion-fade), border-color var(--motion-fade), background var(--motion-fade);
 }
 
 .gear-button:hover {
@@ -358,38 +542,80 @@ p {
   background: var(--surface-soft);
 }
 
+/* Held to the bottom edge of the shell, so a short view and a tall one put it
+   in the same place. */
+.app-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  padding: var(--space-5) 3px 0;
+  color: var(--text-faint);
+  font-size: var(--font-size-sm);
+}
+
+/* Home. */
+.home-view {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-8) 2px 12px;
+  animation: gentle-fade var(--motion-fade);
+}
+
+.home-view .page-title {
+  margin-bottom: 2px;
+}
+
+.home-steps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(max(200px, calc(50% - 6px)), 1fr));
+  gap: var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.home-step {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+}
+
+.home-step .step-badge {
+  border-color: var(--accent);
+  color: var(--accent-text);
+  background: var(--accent);
+}
+
+/* Workflow: the steps list beside the current step. */
 .workspace {
   display: grid;
-  grid-template-columns: 210px minmax(0, 1fr);
+  grid-template-columns: 240px minmax(0, 1fr);
   gap: 30px;
   align-items: start;
-  padding-top: 34px;
+  padding-top: var(--space-8);
 }
 
 .workflow-sidebar {
   position: sticky;
   top: 28px;
-  padding: 20px 16px;
+  padding: var(--space-5) var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   background: var(--surface);
-  box-shadow: 0 10px 28px var(--shadow);
+  box-shadow: var(--shadow-raised);
 }
 
-.workflow-sidebar-title {
+.workflow-sidebar .overline {
   margin-bottom: 14px;
-  padding-left: 4px;
-  color: var(--text-faint);
-  font-size: 0.63rem;
-  font-weight: 800;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
+  padding-left: var(--space-1);
 }
 
 .workflow-steps {
   display: grid;
-  gap: 4px;
-  margin: 0;
+  gap: var(--space-1);
   padding: 0;
   list-style: none;
 }
@@ -398,32 +624,19 @@ p {
   display: flex;
   width: 100%;
   align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
+  gap: var(--space-3);
+  padding: 11px var(--space-3);
   border: 0;
   border-radius: var(--radius-sm);
   color: var(--text-soft);
   background: none;
   cursor: pointer;
   text-align: left;
-  transition: color var(--fade), background var(--fade);
-}
-
-.workflow-step-number {
-  display: grid;
-  width: 26px;
-  height: 26px;
-  flex: 0 0 26px;
-  place-items: center;
-  border: 1px solid var(--border);
-  border-radius: 50%;
-  background: var(--surface-soft);
-  font-size: 0.71rem;
-  font-weight: 700;
+  transition: color var(--motion-fade), background var(--motion-fade);
 }
 
 .workflow-step-label {
-  font-size: 0.78rem;
+  font-size: var(--font-size-body);
   font-weight: 600;
 }
 
@@ -432,641 +645,107 @@ p {
   background: var(--surface-soft);
 }
 
-.workflow-step[data-state="active"] .workflow-step-button {
-  color: var(--text);
-  background: var(--page-accent);
-}
-
-.workflow-step[data-state="active"] .workflow-step-number {
-  border-color: var(--accent);
-  color: var(--accent-text);
-  background: var(--accent);
-}
-
-.workflow-step[data-state="complete"] .workflow-step-number {
-  border-color: var(--border-strong);
-  color: var(--accent-strong);
-}
-
-/* Unfinished steps stay grayed out until their prerequisites are met. */
-.workflow-step[data-state="upcoming"] .workflow-step-button {
+.workflow-step-button:disabled {
   color: var(--text-faint);
   cursor: not-allowed;
   opacity: 0.55;
 }
 
-.intro {
-  max-width: 700px;
-  padding: 0 2px 24px;
+.workflow-step[data-state="active"] .workflow-step-button {
+  color: var(--text);
+  background: var(--page-accent);
 }
 
-.eyebrow {
-  margin-bottom: 8px;
+.workflow-step[data-state="active"] .step-badge {
+  border-color: var(--accent);
+  color: var(--accent-text);
+  background: var(--accent);
+}
+
+.workflow-step[data-state="complete"] .step-badge {
+  border-color: var(--border-strong);
   color: var(--accent-strong);
-  font-size: 0.67rem;
-  font-weight: 800;
-  letter-spacing: 0.13em;
-  text-transform: uppercase;
 }
 
-.intro h1 {
-  margin-bottom: 12px;
-  font-size: clamp(1.9rem, 4vw, 2.8rem);
-  font-weight: 300;
-  line-height: 1.07;
-  letter-spacing: -0.035em;
+.workflow-main {
+  display: grid;
+  gap: var(--space-6);
 }
 
-.intro-copy {
-  margin-bottom: 0;
-  color: var(--text-soft);
-  font-size: 0.98rem;
-  line-height: 1.6;
+.intro {
+  display: grid;
+  gap: var(--space-3);
+  padding: 0 2px;
+}
+
+/* Every step's panel stacks its parts with one gap. */
+.step-panel {
+  display: grid;
+  gap: var(--space-5);
 }
 
 .excel-upload {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 24px;
-  margin-bottom: 22px;
-  padding: 20px 24px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: 0 10px 28px var(--shadow);
+  gap: var(--space-6);
 }
 
 .excel-upload-controls {
   display: grid;
   min-width: 220px;
-  gap: 7px;
-}
-
-.upload-button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
+  gap: var(--space-2);
 }
 
 .upload-button:disabled {
   cursor: wait;
-  opacity: 0.72;
-}
-
-.loading-spinner {
-  width: 15px;
-  height: 15px;
-  border: 2px solid var(--border-strong);
-  border-top-color: var(--accent-strong);
-  border-radius: 50%;
-  animation: spinner-rotate 700ms linear infinite;
-}
-
-/* Sized down from the button spinner to sit on a line of this status text. */
-.status-spinner {
-  width: 11px;
-  height: 11px;
-  flex: none;
-}
-
-.excel-file-status {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 17px;
-  margin: 0;
-  color: var(--text-faint);
-  font-size: 0.69rem;
-  line-height: 1.4;
-}
-
-.excel-file-status[data-state="valid"] {
-  color: var(--success);
-}
-
-.excel-file-status[data-state="error"] {
-  color: var(--danger);
-}
-
-@keyframes spinner-rotate {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-.settings-view,
-.welcome-card {
-  border: 1px solid var(--border);
-  background: var(--surface);
-  box-shadow: 0 14px 36px var(--shadow);
-}
-
-.field {
-  display: grid;
-  gap: 7px;
-}
-
-.field label,
-.settings-form label,
-.settings-group > label,
-.welcome-card > label {
-  color: var(--text);
-  font-size: 0.76rem;
-  font-weight: 700;
-}
-
-.field input,
-.settings-form input,
-.settings-select {
-  width: 100%;
-  padding: 11px 13px;
-  border: 1px solid var(--border-strong);
-  border-radius: var(--radius-sm);
-  background: var(--surface);
-  transition: border-color var(--fade), background var(--fade);
-}
-
-.field input::placeholder {
-  color: var(--text-faint);
-}
-
-.form-actions,
-.settings-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
-  margin-top: 4px;
-}
-
-/* The checkbox list has no trailing space of its own, so its buttons would sit
-   against the last check's description. This makes the gap the 20px the mapping
-   grid leaves above its own buttons. */
-.checks-list {
-  margin-bottom: 16px;
-}
-
-.primary-button,
-.secondary-button {
-  padding: 11px 18px;
-  border-radius: var(--radius-sm);
-  font-size: 0.79rem;
-  font-weight: 700;
-  transition: color var(--fade), border-color var(--fade), background var(--fade);
-}
-
-.primary-button {
-  border: 0;
-  color: var(--text-faint);
-  background: var(--surface-soft);
-}
-
-.primary-button.is-active {
-  color: var(--accent-text);
-  background: var(--accent);
-  box-shadow: 0 6px 15px rgba(217, 125, 73, 0.18);
-  cursor: pointer;
-}
-
-.primary-button.is-active:hover {
-  background: var(--accent-strong);
-}
-
-.secondary-button {
-  border: 1px solid var(--border-strong);
-  color: var(--text-soft);
-  background: var(--surface);
-  cursor: pointer;
-}
-
-.secondary-button:hover {
-  color: var(--text);
-  background: var(--surface-soft);
-}
-
-.form-message,
-.settings-message {
-  min-height: 18px;
-  margin: 0;
-  font-size: 0.73rem;
-}
-
-.form-message[data-state="error"],
-.settings-message[data-state="error"] {
-  color: var(--danger);
-}
-
-.settings-message[data-state="success"] {
-  color: var(--success);
-}
-
-.mapping-section,
-.results-section {
-  margin-bottom: 22px;
-  padding: clamp(20px, 3vw, 30px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: 0 12px 30px var(--shadow);
-  animation: gentle-fade var(--fade);
 }
 
 .mapping-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
-  gap: 16px;
+  gap: var(--space-4);
 }
 
-.mapping-form label small {
-  color: var(--text-faint);
-  font-weight: 500;
-}
-
-.mapping-actions {
+.mapping-form > .copy,
+.mapping-form > .message,
+.mapping-form > .actions {
   grid-column: 1 / -1;
-  align-items: center;
-  margin-top: 4px;
 }
 
-.results-section {
-  display: flex;
-  flex-direction: column;
-}
-
-.export-message-lead {
-  margin: 0 0 6px;
-}
-
-.export-columns {
-  margin: 0;
-  padding-left: 18px;
-  display: grid;
-  gap: 3px;
-}
-
-.settings-view {
-  margin-top: 30px;
-  padding: clamp(24px, 4vw, 38px);
-  border-radius: var(--radius-lg);
-  animation: gentle-fade var(--fade);
-}
-
-.settings-view-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-
-.settings-view-head h2 {
-  margin: 0;
-  font-weight: 300;
-}
-
-.settings-column {
-  display: grid;
-  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
-  gap: 34px;
-}
-
-.settings-group h3 {
-  margin-bottom: 8px;
-  font-weight: 400;
-}
-
-.settings-intro {
-  margin-bottom: 18px;
-  color: var(--text-soft);
-  font-size: 0.81rem;
-  line-height: 1.55;
-}
-
-.settings-form {
-  display: grid;
-  gap: 8px;
-}
-
-.settings-form label,
-.settings-group > label {
-  display: grid;
-  gap: 7px;
-  margin-top: 8px;
-}
-
-.settings-hint {
-  margin: 4px 0 12px;
-  color: var(--text-faint);
-  font-size: 0.69rem;
-}
-
-.provider-fields {
-  display: grid;
-  gap: 7px;
-  margin-top: 12px;
-  animation: gentle-fade var(--fade);
-}
-
-.credential-fields {
-  display: grid;
-  gap: 7px;
-}
-
-/* Header cell fields sit side by side; each label stays with its own input. */
-/* Header cell fields sit side by side; each label stays with its own input. The
-   subhead above supplies the gap, so the grid adds none of its own. */
-.cell-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: var(--dialog-heading-gap, 10px) 16px;
-  margin-top: 0;
-}
-
-.cell-field {
-  display: grid;
-  gap: 5px;
-}
-
-.cell-field label {
-  color: var(--text);
-  font-size: 0.72rem;
-  font-weight: 700;
-}
-
-.cell-field input {
-  text-transform: uppercase;
-}
-
-/* The settings dialogs each hold one short form, so they stay narrow.
-
-   One vertical rhythm governs everything inside: `--dialog-gap` between blocks,
-   and the tighter `--dialog-heading-gap` between a heading and what it
-   introduces. Both are declared here so every rule below reads from one place
-   rather than each picking its own margin. */
-.settings-dialog-card {
-  --dialog-gap: 18px;
-  --dialog-heading-gap: 10px;
-  width: min(560px, 100%);
-  gap: 0;
-  background: var(--surface);
-  box-shadow: 0 18px 50px var(--shadow);
-}
-
-.settings-dialog-card h3 {
-  margin-bottom: var(--dialog-heading-gap);
-}
-
-/* Standing copy under a dialog title, explaining the form without a button to
-   reveal it. */
-.dialog-subtext {
-  margin: 0 0 var(--dialog-gap);
-  color: var(--text-soft);
-  font-size: 0.74rem;
-  line-height: 1.6;
-}
-
-.settings-dialog-card .settings-actions {
-  margin-top: var(--dialog-gap);
-}
-
-.settings-check {
-  align-self: center;
-  font-size: 0.84rem;
-  font-weight: 700;
-}
-
-.settings-check[data-configured="true"] {
-  color: var(--success);
-  font-size: 1.05rem;
-}
-
-.settings-check[data-configured="false"] {
-  color: var(--text-soft);
-  font-weight: 500;
-}
-
-.provider-fields-head,
-.credential-label {
-  display: flex !important;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.provider-fields-head a {
-  color: var(--accent-strong);
-  font-size: 0.72rem;
-  font-weight: 600;
-  text-underline-offset: 3px;
-}
-
-.credential-label strong {
-  color: var(--danger);
-  font-size: 0.68rem;
-  font-weight: 600;
-}
-
-.credential-label strong[data-configured="true"] {
-  color: var(--success);
-}
-
-.settings-subhead {
-  margin: var(--dialog-gap, 18px) 0 var(--dialog-heading-gap, 10px);
-}
-
-.settings-toggle {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-top: 12px;
-  color: var(--text-soft);
-}
-
-/* Inside a dialog the shared `.settings-form label` grid rule is more specific
-   than `.settings-toggle`, so it would stack the box above its text. */
-.settings-form label.settings-toggle {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  margin-top: 12px;
-}
-
-/* `.settings-form input` stretches text inputs to full width; a checkbox must
-   keep its intrinsic size. */
-.settings-form .settings-toggle input {
-  width: auto;
-}
-
-.settings-toggle input {
-  margin-top: 3px;
-  accent-color: var(--accent-strong);
-}
-
-.settings-toggle strong,
-.settings-toggle small {
-  display: block;
-}
-
-.settings-toggle strong {
-  color: var(--text);
-  font-size: 0.8rem;
-}
-
-.settings-toggle small {
-  margin-top: 2px;
-  color: var(--text-faint);
-  font-size: 0.7rem;
-}
-
-.welcome-overlay {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  padding: 24px;
-  place-items: center;
-  background: var(--overlay);
-  backdrop-filter: blur(6px);
-  animation: overlay-fade var(--fade);
-}
-
-.welcome-card {
-  position: relative;
-  display: grid;
-  width: min(880px, 100%);
-  max-height: calc(100vh - 48px);
-  padding: clamp(32px, 5vw, 52px);
-  overflow-y: auto;
-  gap: 28px;
-  border-radius: var(--radius-lg);
-}
-
-/* Held to the bottom edge of the shell rather than to the end of the content, so
-   a short step and a tall step put the runtime line in the same place. */
-.app-footer {
-  display: flex;
-  justify-content: space-between;
-  gap: 18px;
-  margin-top: auto;
-  padding: 20px 3px 0;
-  color: var(--text-faint);
-  font-size: 0.68rem;
-}
-
-@keyframes gentle-fade {
-  from {
-    opacity: 0;
-    transform: translateY(5px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes overlay-fade {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-html[data-motion="reduced"] *,
-html[data-motion="reduced"] *::before,
-html[data-motion="reduced"] *::after {
-  animation-duration: 0ms !important;
-  transition-duration: 0ms !important;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .settings-view,
-  .welcome-overlay {
-    animation: none;
-  }
-}
-
-@media (max-width: 760px) {
-  .app-shell {
-    width: min(100% - 28px, 1060px);
-  }
-
-  .settings-column,
-  .workspace {
-    grid-template-columns: 1fr;
-  }
-
-  .workflow-sidebar {
-    position: static;
-  }
-
-  .workflow-steps {
-    grid-auto-flow: column;
-    grid-auto-columns: 1fr;
-  }
-
-  .workflow-step-label {
-    display: none;
-  }
-
-  .workflow-step-button {
-    justify-content: center;
-  }
-
-  .excel-upload {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .excel-upload-controls {
-    min-width: 0;
-  }
-
-}
-
-@media (max-width: 520px) {
-  .cobrand-connector {
-    display: none;
-  }
-
-  .app-footer {
-    flex-direction: column;
-  }
-}
-
-/* Processing (waiting) screen — mock 05 */
+/* Processing (waiting) screen. While checks run the steps cannot be used and
+   the step header is stale, so both step aside and the progress card sits in
+   the middle of the window. */
 .processing-section {
   display: grid;
   place-items: center;
   padding: clamp(28px, 6vw, 64px) 0;
-  animation: gentle-fade var(--fade);
+  animation: gentle-fade var(--motion-fade);
+}
+
+.workspace:has(.processing-section:not([hidden])) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.workspace:has(.processing-section:not([hidden])) .workflow-sidebar,
+.workspace:has(.processing-section:not([hidden])) .intro {
+  display: none;
 }
 
 .processing-card {
   width: min(520px, 100%);
   display: grid;
-  gap: 16px;
+  gap: var(--space-4);
   justify-items: center;
+  padding: var(--space-8);
   text-align: center;
-  padding: clamp(28px, 4vw, 40px);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
-  background: var(--surface);
-  box-shadow: 0 14px 36px var(--shadow);
-}
-
-.processing-card h2 {
-  margin: 0;
-  font-size: 1.15rem;
 }
 
 .run-steps {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 18px;
+  gap: var(--space-2) 18px;
   justify-content: center;
-  margin: 0;
   padding: 0;
   list-style: none;
 }
@@ -1075,12 +754,12 @@ html[data-motion="reduced"] *::after {
   display: flex;
   align-items: center;
   gap: 7px;
-  font-size: 0.76rem;
-  font-weight: 600;
   color: var(--text-faint);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
 }
 
-/* A dot before each label carries the state as color, so the step reads at a glance. */
+/* A dot before each label carries the state as colour, so the step reads at a glance. */
 .run-step::before {
   content: "";
   width: 9px;
@@ -1122,12 +801,11 @@ html[data-motion="reduced"] *::after {
   border-radius: 999px;
   background: var(--accent-strong);
   transform-origin: left center;
-  animation: processing-fill 1.6s ease-in-out infinite;
+  animation: processing-fill var(--motion-pulse) infinite;
 }
 
 /* Until the first row is reported there is no fraction to show, so the bar fills
-   over and over. It fades at full width so restarting at the left edge reads as
-   another pass and not as progress lost. */
+   over and over, fading at full width so a restart reads as another pass. */
 @keyframes processing-fill {
   0% {
     width: 0;
@@ -1143,22 +821,24 @@ html[data-motion="reduced"] *::after {
   }
 }
 
-/* Once rows are reported the bar holds the fraction done, easing to each new
-   position so a batch landing does not read as a jump. */
+/* Once rows are reported the bar holds the fraction done, easing to each new position. */
 .processing-bar[data-state="determinate"] .processing-bar-fill {
   width: 0;
   animation: none;
   opacity: 1;
-  transition: width 240ms ease-out;
+  transition: width var(--motion-progress);
+}
+
+[data-motion="reduced"] .processing-bar-fill {
+  animation: none;
 }
 
 .processing-percent {
-  margin: 0;
-  font-size: 1.6rem;
+  color: var(--accent-strong);
+  font-size: var(--font-size-heading);
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-  color: var(--accent-strong);
 }
 
 .processing-percent:empty {
@@ -1166,66 +846,243 @@ html[data-motion="reduced"] *::after {
 }
 
 .processing-count {
-  margin: 0;
-  font-weight: 700;
   color: var(--text);
-}
-
-.processing-status {
-  margin: 0;
-  color: var(--text-soft);
-  font-size: 0.85rem;
+  font-weight: 700;
 }
 
 .processing-privacy {
-  margin: 0;
   color: var(--success);
-  font-size: 0.8rem;
+  font-size: var(--font-size-sm);
 }
 
-/* With motion off, the determinate fill still shows the fraction done; it just
-   eases to each new position without the reduced-motion sweep. */
-[data-motion="reduced"] .processing-bar-fill {
-  animation: none;
-}
-
-/* Results summary stat tiles — mock 06 */
+/* Results. */
 .results-stats {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin: 4px 0 18px;
+  gap: var(--space-3);
 }
 
 .results-stat {
   display: grid;
-  gap: 4px;
-  padding: 14px 16px;
+  gap: var(--space-1);
+  padding: 14px var(--space-4);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: var(--surface);
 }
 
 .results-stat-value {
-  font-size: 1.6rem;
+  color: var(--text);
+  font-size: var(--font-size-heading);
   font-weight: 800;
   line-height: 1.1;
-  color: var(--text);
 }
 
 .results-stat[data-tone="good"] .results-stat-value {
   color: var(--success);
 }
 
-.results-stat-label {
-  font-size: 0.68rem;
-  letter-spacing: 0.06em;
+.export-columns {
+  display: grid;
+  gap: 3px;
+  margin-top: var(--space-2);
+  padding-left: 18px;
+  font-weight: 400;
+}
+
+/* Settings page. */
+.settings-view {
+  display: grid;
+  gap: var(--space-6);
+  margin-top: var(--space-8);
+}
+
+.settings-view-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+}
+
+/* Each group's title, description and button share rows with the group beside
+   it, so the buttons line up even when one description wraps. */
+.settings-column {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-8);
+}
+
+.settings-group {
+  display: grid;
+  grid-row: span 3;
+  grid-template-rows: subgrid;
+  row-gap: var(--space-3);
+  align-items: start;
+}
+
+/* Dialogs. */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  padding: var(--space-6);
+  place-items: center;
+  background: var(--overlay);
+  backdrop-filter: blur(6px);
+  animation: overlay-fade var(--motion-fade);
+}
+
+/* Sized in rem so a dialog grows with the text on large windows rather than
+   cramping it, with a little more room around its contents than a step panel. */
+.dialog-card {
+  position: relative;
+  width: min(var(--dialog-width, 36rem), 100%);
+  padding: var(--space-8);
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
+  box-shadow: var(--shadow-dialog);
+}
+
+/* For dialogs holding only a couple of switches. */
+.dialog-card--compact {
+  --dialog-width: 32rem;
+}
+
+/* The title and the close button share the first row: the button is lifted to
+   the top-right corner and the title keeps clear of it. */
+.dialog-close {
+  position: absolute;
+  top: var(--space-5);
+  right: var(--space-5);
+  margin: 0;
+}
+
+.dialog-title {
+  padding-right: 52px;
+}
+
+/* Every dialog stacks its parts with one gap; the actions row sits a step further down. */
+.dialog-body {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.dialog-body > .actions {
+  margin-top: var(--space-2);
+}
+
+.dialog-body .select {
+  width: min(22ch, 100%);
+}
+
+/* The way to the key partners need, so it is a button rather than a footnote link. */
+.smarty-keys-button {
+  justify-self: start;
+  color: var(--accent-strong);
+}
+
+.credential-fields {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* One row per field: the label, then an input sized to a cell reference such as F1. */
+.cell-grid {
+  display: grid;
+  grid-template-columns: max-content 10ch;
+  gap: var(--space-3) var(--space-4);
+  align-items: center;
+}
+
+.cell-grid .field {
+  display: contents;
+}
+
+.cell-grid .input {
   text-transform: uppercase;
-  color: var(--text-faint);
+}
+
+/* Animations. */
+@keyframes gentle-fade {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes overlay-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes spinner-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .dialog-overlay,
+  .disclosure[open] > :not(summary) {
+    animation: none;
+  }
+}
+
+/* Narrow windows. */
+@media (max-width: 760px) {
+  .settings-column,
+  .workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .workflow-sidebar {
+    position: static;
+  }
+
+  .workflow-steps {
+    grid-auto-flow: column;
+    grid-auto-columns: 1fr;
+  }
+
+  .workflow-step-label {
+    display: none;
+  }
+
+  .workflow-step-button {
+    justify-content: center;
+  }
+
+  .excel-upload {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .excel-upload-controls {
+    min-width: 0;
+  }
 }
 
 @media (max-width: 620px) {
   .results-stats {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 520px) {
+  .cobrand-connector {
+    display: none;
+  }
+
+  .app-footer {
+    flex-direction: column;
   }
 }

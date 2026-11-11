@@ -2,16 +2,12 @@ import type { CheckOutcome } from "../../types/eligibility.js";
 import type { ProgressReporter } from "../../types/progress.js";
 
 /**
- * Runs `work` over `items` with at most `limit` of them in flight, returning one
- * outcome per item in input order however they finish.
+ * Run `work` over `items` with at most `limit` in flight, returning one outcome
+ * per item in input order.
  *
- * An item that throws becomes an `ok: false` outcome rather than rejecting, so a
- * single bad row cannot abandon the rest of the sheet. That is the whole reason
- * this returns outcomes instead of values.
- *
- * `limit` is bounded rather than unbounded because these items are network calls
- * against a public service: too many at once invites throttling, and one at a
- * time is needlessly slow.
+ * An item that throws becomes an `ok: false` outcome rather than rejecting, so
+ * one bad row cannot abandon the rest of the sheet. `limit` is bounded because
+ * the items are calls to a public service: too many at once invites throttling.
  */
 export async function mapWithConcurrency<Item, Value>(
   items: readonly Item[],

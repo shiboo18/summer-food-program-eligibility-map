@@ -17,7 +17,7 @@ export type CellMappingResult =
   | { readonly ok: true; readonly cells: Readonly<Partial<Record<AddressField, string>>> }
   | { readonly ok: false; readonly message: string };
 
-/** Validates typed header cells, reporting the first problem found. */
+/** Validate typed header cells, reporting the first problem found. */
 export function parseTypedCells(entries: readonly TypedCell[]): CellMappingResult {
   const cells: Partial<Record<AddressField, string>> = {};
 
@@ -39,8 +39,8 @@ export function parseTypedCells(entries: readonly TypedCell[]): CellMappingResul
 }
 
 /**
- * The cells that follow a lead cell, one per remaining field. Headers share a
- * row, so the next field sits in the next column.
+ * Return the cells after a lead cell, one per remaining field. Headers share a
+ * row, so each next field sits in the next column.
  */
 export function followingCells(lead: string, count: number): readonly string[] {
   const column = columnNumberFromCell(lead);

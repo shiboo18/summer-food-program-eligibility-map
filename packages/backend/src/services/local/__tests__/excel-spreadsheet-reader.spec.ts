@@ -50,10 +50,7 @@ async function createWorkbook(): Promise<string> {
   ]);
 }
 
-/**
- * Annotates into a copy beside the original, which is the only way the app writes
- * results, and returns the copy's path.
- */
+/** Annotate into a copy beside the original, as the app does, and return the copy's path. */
 async function annotateToCopy(
   filePath: string,
   annotations: readonly ResultAnnotation[],
@@ -314,10 +311,9 @@ describe("ExcelSpreadsheetReader", () => {
     // Standardized address written only for the corrected row, in the column before the status.
     expect(sheet.getRow(2).getCell(6).value).toBe("123 Main St, Austin, TX 78701-1234");
     expect(sheet.getRow(3).getCell(6).value ?? "").toBe("");
-    // Corrected addresses are color-coded, and the column is widened so it reads without resizing.
+    // Corrected addresses are color-coded, and the column is widened.
     expect((sheet.getRow(2).getCell(6).fill as ExcelJS.FillPattern).fgColor?.argb).toBe("FFFCE9C8");
     expect(sheet.getColumn(6).width).toBe(36);
-    // Status cell written and color-coded.
     const statusCell = sheet.getRow(2).getCell(7);
     expect(statusCell.value).toBe("Valid and corrected");
     expect((statusCell.fill as ExcelJS.FillPattern).fgColor?.argb).toBe("FFDDF3DD");

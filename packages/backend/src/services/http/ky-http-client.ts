@@ -5,14 +5,12 @@ import { HTTP_CLIENT_CONFIG } from "../../config/constants.js";
 
 /**
  * JSON-over-HTTP transport, one instance per external system with its base URL
- * injected once.
+ * injected.
  *
- * ky supplies the retry behaviour a large batch needs. A 429 (and 413/503) is
- * retried using the service's own `Retry-After`, which may be either a number of
- * seconds or an HTTP-date, with the rate-limit headers as a fallback; other
- * retryable failures back off exponentially. ky deliberately skips jitter when
- * the server named a delay, so an explicit instruction is followed exactly.
- * Getting all of that right by hand is far more code than it looks.
+ * ky supplies the retries a large batch needs: a 429 (and 413/503) waits for the
+ * service's `Retry-After` (seconds or an HTTP-date, else the rate-limit headers),
+ * and other retryable failures back off exponentially. ky skips jitter when the
+ * server names a delay, so that delay is followed exactly.
  */
 export class KyHttpClient implements HttpGetClient {
   private readonly baseUrl: string;

@@ -19,6 +19,6 @@ export interface WorkflowStep {
   readonly focusSelector: string;
   title(context: WorkflowContext): string;
   description(context: WorkflowContext): string;
-  /** A step stays grayed out until its own prerequisites are met. */
+  /** Return whether the step's prerequisites are met; until then it is grayed out. */
   isAvailable(context: WorkflowContext): boolean;
 }

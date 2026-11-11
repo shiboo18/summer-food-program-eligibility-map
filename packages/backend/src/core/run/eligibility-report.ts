@@ -30,12 +30,11 @@ export interface EligibilityReportInput {
 }
 
 /**
- * Turns the passes of a run into the report the screen and the export both read.
+ * Build the report the screen and the export read from a run's passes.
  *
- * Every row the run touched appears exactly once, whether it was checked, could
- * not be located, or was set aside while reading, so the counts always add up to
- * the sheet. A row whose check failed keeps the location it did resolve and is
- * flagged for verification, rather than being discarded.
+ * Every row appears exactly once, whether checked, unlocated, unverified, or set
+ * aside while reading, so the counts add up to the sheet. A row whose check
+ * failed keeps its location and is flagged for verification.
  */
 export function buildEligibilityReport(input: EligibilityReportInput): EligibilityReport {
   const minimumScore = input.minimumMatchScore ?? GEOCODE_MINIMUM_MATCH_SCORE;
@@ -118,7 +117,6 @@ function unlocatedResult(row: UnlocatedRow): EligibilityRowResult {
   };
 }
 
-/** A row Smarty could not verify, so no USDA check was attempted for it. */
 function unverifiedResult(rowNumber: number): EligibilityRowResult {
   return {
     rowNumber,

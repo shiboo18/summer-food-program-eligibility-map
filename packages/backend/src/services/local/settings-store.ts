@@ -2,11 +2,18 @@ import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, rename, unlink, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-/** The Smarty secrets this store holds. Every credential loop walks this list. */
-const smartyCredentials = ["smartyAuthId", "smartyAuthToken"] as const;
-type SmartyCredential = (typeof smartyCredentials)[number];
-export type CredentialInput = Readonly<Partial<Record<SmartyCredential, string>>>;
-export type CredentialStatus = Readonly<Record<SmartyCredential, boolean>>;
+import type {
+  CredentialInput,
+  CredentialStatus,
+  SmartyCredentialField as SmartyCredential,
+  SmartyCredentials,
+} from "../../types/credentials.js";
+
+/** Longer than any real Smarty key half, short enough to refuse pasted prose. */
+const maximumCredentialLength = 4096;
+
+/** The Smarty secrets this store holds. */
+const smartyCredentials: readonly SmartyCredential[] = ["smartyAuthId", "smartyAuthToken"];
 
 export interface SecretProtector {
   isEncryptionAvailable(): boolean;
@@ -35,32 +42,27 @@ export class SettingsStore {
     };
   }
 
-  public async save(value: unknown): Promise<CredentialStatus> {
+  /**
+   * Replace the stored key. The whole file is written afresh, so an unreadable
+   * one is replaced rather than blocking every save.
+   */
+  public async save({ authId, authToken }: SmartyCredentials): Promise<CredentialStatus> {
     if (!this.protector.isEncryptionAvailable()) {
       throw new Error("Secure credential storage is unavailable on this device.");
     }
-
-    const input = parseCredentialInput(value);
-    const settings = await this.read();
-    let changed = false;
-    for (const name of smartyCredentials) {
-      const credential = input[name]?.trim();
-      if (credential === undefined || credential.length === 0) {
-        continue;
-      }
-      if (credential.length > 4096) {
-        throw new Error("A credential exceeds the supported length.");
-      }
-      settings.credentials[name] = Buffer.from(this.protector.encryptString(credential)).toString("base64");
-      changed = true;
+    if (authId.length > maximumCredentialLength || authToken.length > maximumCredentialLength) {
+      throw new Error("A credential exceeds the supported length.");
     }
 
-    if (!changed) {
-      throw new Error("Enter at least one credential to save.");
-    }
-
-    await this.write(settings);
+    await this.write({
+      version: 1,
+      credentials: { smartyAuthId: this.encrypt(authId), smartyAuthToken: this.encrypt(authToken) },
+    });
     return this.getStatus();
+  }
+
+  private encrypt(value: string): string {
+    return Buffer.from(this.protector.encryptString(value)).toString("base64");
   }
 
   public async getCredentials(): Promise<CredentialInput> {
@@ -76,9 +78,9 @@ export class SettingsStore {
   }
 
   /**
-   * Stored credentials become unreadable if the operating-system key changes,
-   * for example when the application name changes. Treat them as absent so the
-   * user is asked to enter them again instead of hitting a decryption failure.
+   * Stored credentials become unreadable if the operating-system key changes, for
+   * example when the application name changes. Treat them as absent so the user
+   * re-enters them instead of hitting a decryption failure.
    */
   private decrypt(value: string | undefined): string | undefined {
     if (value === undefined) {
@@ -135,7 +137,8 @@ export class SettingsStore {
   }
 }
 
-function parseCredentialInput(value: unknown): CredentialInput {
+/** Parse credentials sent from the renderer, rejecting anything malformed. */
+export function parseCredentialInput(value: unknown): CredentialInput {
   if (typeof value !== "object" || value === null) {
     throw new Error("Credential settings are invalid.");
   }

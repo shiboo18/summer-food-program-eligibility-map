@@ -57,17 +57,17 @@ describe("runProgressView", () => {
 describe("runPhaseSteps", () => {
   test("marks earlier phases done, the current one running, and later ones pending", () => {
     expect(runPhaseSteps(all, "rural").map((step) => [step.label, step.state])).toEqual([
-      ["Address Verification", "done"],
-      ["USDA Rural", "running"],
-      ["USDA Eligibility", "pending"],
+      ["Address check", "done"],
+      ["USDA rural designation", "running"],
+      ["USDA area eligibility", "pending"],
     ]);
   });
 
   test("marks a phase this run skips as off", () => {
     expect(runPhaseSteps(["verifying", "area"], "verifying").map((step) => [step.label, step.state])).toEqual([
-      ["Address Verification", "running"],
-      ["USDA Rural", "off"],
-      ["USDA Eligibility", "pending"],
+      ["Address check", "running"],
+      ["USDA rural designation", "off"],
+      ["USDA area eligibility", "pending"],
     ]);
   });
 });

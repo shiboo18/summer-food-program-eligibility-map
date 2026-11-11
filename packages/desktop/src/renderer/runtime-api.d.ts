@@ -1,5 +1,6 @@
 import type {
   ColumnMapping,
+  CredentialCheck,
   CredentialInput,
   CredentialStatus,
   EligibilityChecks,
@@ -19,6 +20,15 @@ export interface SpreadsheetSelection {
   readonly rowCount: number;
 }
 
+/** What saving credentials did. A key Smarty refuses is not stored, so `status` is unchanged. */
+export interface CredentialSaveResult {
+  readonly saved: boolean;
+  /** Smarty's answer about the key the save would leave stored. */
+  readonly check: CredentialCheck;
+  /** Which halves are stored after the save. */
+  readonly status: CredentialStatus;
+}
+
 export interface ExportResult {
   readonly canceled: boolean;
   readonly filePath?: string;
@@ -31,7 +41,7 @@ declare global {
       getRuntimeInfo(): RuntimeInfo;
       readonly spreadsheet: {
         open(): Promise<SpreadsheetSelection | null>;
-        /** Reveals the opened workbook in the OS file manager. */
+        /** Reveal the opened workbook in the OS file manager. */
         reveal(fileName: string): Promise<void>;
         validate(fileName: string, mapping: ColumnMapping): Promise<ValidationReport>;
       };
@@ -40,17 +50,20 @@ declare global {
       };
       readonly results: {
         export(fileName: string): Promise<ExportResult>;
-        /** Reveals the exported copy in the OS file manager. */
-        reveal(fileName: string): Promise<void>;
+        /** Show the exported copy in the OS file manager, then open it in its default app. */
+        open(fileName: string): Promise<void>;
       };
       readonly run: {
-        /** Subscribes to a run's progress. Returns the unsubscribe function. */
+        /** Subscribe to a run's progress. Returns the unsubscribe function. */
         onProgress(listener: (progress: RunProgress) => void): () => void;
       };
       readonly settings: {
         getStatus(): Promise<CredentialStatus>;
-        save(input: CredentialInput): Promise<CredentialStatus>;
+        /** Store the typed halves unless Smarty refuses the key they would leave stored. */
+        save(input: CredentialInput): Promise<CredentialSaveResult>;
         clear(): Promise<CredentialStatus>;
+        /** Ask Smarty about the stored key. Resolves `"not-set"` without asking when any half is missing. */
+        verify(): Promise<CredentialCheck>;
       };
       readonly preferences: {
         get(): Promise<Preferences>;

@@ -8,6 +8,8 @@
     />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>vibeCheck</title>
+    <!-- The theme's tokens first; styles.css builds every component from them. -->
+    <link rel="stylesheet" href="./theme.css" />
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
@@ -19,7 +21,7 @@
             <span class="product-name">vibeCheck</span>
             <span class="cobrand">
               <span class="cobrand-primary">Share Our Strength</span>
-              <span class="cobrand-connector">with</span>
+              <span class="cobrand-connector overline">with</span>
               <span class="cobrand-secondary">Amazon</span>
             </span>
           </span>
@@ -49,21 +51,25 @@
       </header>
 
       <section id="home-view" class="home-view" aria-labelledby="home-title">
-        <h1 id="home-title">Welcome to vibeCheck.</h1>
-        <p class="home-copy">
+        <h1 id="home-title" class="page-title">Welcome to vibeCheck.</h1>
+        <p class="copy">
           vibeCheck verifies every address in an Excel workbook against Smarty and ArcGIS, then checks USDA rural and
-          area eligibility. <a id="home-settings-link" class="text-link" href="#" role="button">Open settings</a> to add
-          your Smarty credentials.
+          area eligibility.
+        </p>
+        <!-- Shown, with a way to fix it, exactly when Get started is held back. -->
+        <p id="home-credential-notice" class="message" data-tone="idle" role="status" hidden>
+          <span id="home-credential-notice-text"></span>
+          <a id="home-credential-notice-link" class="text-link" href="#" role="button">Open settings</a>
         </p>
 
-        <details class="privacy-note">
-          <summary class="privacy-note-summary">🔒 Click to see the privacy note</summary>
-          <p class="privacy-note-lead">
+        <details class="disclosure">
+          <summary class="subhead">🔒 Privacy note</summary>
+          <p class="copy">
             Your data stays on your computer. Only the address fields are sent out — never names, phone numbers, or
             anything else in your spreadsheet.
           </p>
-          <p class="privacy-note-detail">Each address is sent only to the providers that check it:</p>
-          <ul class="privacy-providers">
+          <p class="copy">Each address is sent only to the providers that check it:</p>
+          <ul class="disclosure-list copy">
             <li><strong>Smarty</strong> — verifies and standardizes each address.</li>
             <li><strong>ArcGIS</strong> — finds the map location an address sits at.</li>
             <li><strong>USDA</strong> — the rural and area-eligibility maps.</li>
@@ -72,110 +78,126 @@
 
         <ol id="home-steps" class="home-steps"></ol>
 
-        <div class="form-actions">
-          <button id="home-start" class="primary-button is-active" type="button">Get started</button>
+        <div class="actions">
+          <!-- Greyed out until the stored key can run checks. -->
+          <button id="home-start" class="primary-button" type="button" disabled>Get started</button>
         </div>
       </section>
 
       <div id="app-view" class="workspace" hidden>
         <nav class="workflow-sidebar" aria-label="Validation steps">
-          <p class="workflow-sidebar-title">Steps</p>
+          <p class="overline">Steps</p>
           <ol id="workflow-steps" class="workflow-steps"></ol>
         </nav>
 
         <div class="workflow-main">
           <section class="intro" aria-labelledby="intro-title">
-            <p id="intro-eyebrow" class="eyebrow">Step 1 of 4</p>
-            <h1 id="intro-title">Upload an Excel file</h1>
-            <p id="intro-copy" class="intro-copy">
-              Choose the workbook that contains the addresses you want to validate.
-            </p>
+            <p id="intro-eyebrow" class="overline eyebrow">Step 1 of 4</p>
+            <h1 id="intro-title" class="page-title">Upload an Excel file</h1>
+            <p id="intro-copy" class="copy">Choose the workbook that contains the addresses you want to validate.</p>
           </section>
 
-          <section id="upload-section" class="excel-upload" aria-labelledby="intro-title">
+          <section id="upload-section" class="panel excel-upload" aria-labelledby="intro-title">
             <div class="excel-upload-controls">
               <button id="upload-excel" class="secondary-button upload-button" type="button">
                 <span id="upload-spinner" class="loading-spinner" aria-hidden="true" hidden></span>
                 <span id="upload-label">Upload Excel file</span>
               </button>
-              <p id="excel-file-status" class="excel-file-status" data-state="idle" aria-live="polite">
-                <span id="excel-file-spinner" class="loading-spinner status-spinner" aria-hidden="true" hidden></span>
+              <p id="excel-file-status" class="status" data-tone="idle" aria-live="polite">
+                <span id="excel-file-spinner" class="loading-spinner" aria-hidden="true" hidden></span>
                 <span id="excel-file-message"></span>
               </p>
             </div>
           </section>
 
-          <section id="mapping-section" class="mapping-section" aria-labelledby="intro-title" hidden>
+          <section id="mapping-section" class="panel" aria-labelledby="intro-title" hidden>
             <form id="mapping-form" class="mapping-form" novalidate>
+              <!-- Says which row the names came from, so nobody wonders whether to skip it. -->
+              <p id="mapping-hint" class="copy"></p>
               <div class="field">
-                <label for="map-line1">Street address</label>
-                <select id="map-line1" name="line1" class="settings-select"></select>
+                <label class="field-label" for="map-line1">Street address</label>
+                <select id="map-line1" name="line1" class="select"></select>
               </div>
               <div class="field">
-                <label for="map-line2">Street address line 2 <small>(optional)</small></label>
-                <select id="map-line2" name="line2" class="settings-select"></select>
+                <label class="field-label" for="map-line2"
+                  >Street address line 2 <span class="field-optional">(optional)</span></label
+                >
+                <select id="map-line2" name="line2" class="select"></select>
               </div>
               <div class="field">
-                <label for="map-city">City</label>
-                <select id="map-city" name="city" class="settings-select"></select>
+                <label class="field-label" for="map-city">City</label>
+                <select id="map-city" name="city" class="select"></select>
               </div>
               <div class="field">
-                <label for="map-state">State</label>
-                <select id="map-state" name="state" class="settings-select"></select>
+                <label class="field-label" for="map-state">State</label>
+                <select id="map-state" name="state" class="select"></select>
               </div>
               <div class="field">
-                <label for="map-postalCode">ZIP code</label>
-                <select id="map-postalCode" name="postalCode" class="settings-select"></select>
+                <label class="field-label" for="map-postalCode">ZIP code</label>
+                <select id="map-postalCode" name="postalCode" class="select"></select>
               </div>
 
-              <div class="form-actions mapping-actions">
-                <button id="validate-addresses" class="primary-button is-active" type="submit">
-                  Next: choose checks
-                </button>
-                <p id="form-message" class="form-message" aria-live="polite"></p>
+              <p id="form-message" class="message" data-tone="idle" aria-live="polite"></p>
+              <div class="actions">
+                <button id="validate-addresses" class="primary-button" type="submit">Next: choose checks</button>
               </div>
             </form>
           </section>
 
-          <section id="checks-section" class="checks-section" aria-labelledby="intro-title" hidden>
-            <div class="checks-list">
-              <label class="settings-toggle">
+          <section id="checks-section" class="panel step-panel" aria-labelledby="intro-title" hidden>
+            <div class="check-list">
+              <label class="check-row">
                 <input id="check-address-validation" type="checkbox" checked disabled />
                 <span
-                  ><strong>Address validation &amp; deliverability (required)</strong>
-                  <small>Confirms each address and produces its location. Uses your Smarty account.</small></span
+                  ><strong>Address check</strong>
+                  <small>Always runs. Confirms each address and finds its location, using your Smarty account.</small></span
                 >
               </label>
-              <label class="settings-toggle">
+              <label class="check-row">
                 <input id="check-rural" type="checkbox" />
                 <span
-                  ><strong>USDA rural eligibility</strong>
-                  <small>Checks whether the address falls in a USDA-designated rural area. Checked online against USDA data.</small></span
+                  ><strong>USDA rural designation</strong>
+                  <small>Turn on if you serve, or plan to serve, summer meals to go or by delivery.</small></span
                 >
               </label>
-              <label class="settings-toggle">
+              <label class="check-row">
                 <input id="check-area" type="checkbox" />
                 <span
                   ><strong>USDA area eligibility</strong>
-                  <small
-                    >Checks area eligibility by census geography (in zone / with approval / out of zone). Checked
-                    online against USDA data.</small
-                  ></span
+                  <small>Turn on to see which addresses are in an area that qualifies for open summer meal sites.</small></span
                 >
               </label>
             </div>
-            <div class="form-actions">
-              <button id="run-checks" class="primary-button is-active" type="button">
+            <details class="disclosure">
+              <summary class="subhead">Which USDA checks do I need?</summary>
+              <ul class="disclosure-list copy">
+                <li>
+                  <strong>USDA rural designation</strong> — whether each address is rural on USDA's summer meals map.
+                  In rural areas with no on-site meal service, summer meals can be served to go or by delivery. Results
+                  read Rural or Not Rural.
+                </li>
+                <li>
+                  <strong>USDA area eligibility</strong> — whether each address is in an area where at least half the
+                  children qualify for free or reduced-price meals, which open summer meal sites need. Results read In
+                  Area — Eligible, In Area — Averaged (eligible only with State agency and USDA approval), or Not
+                  Eligible.
+                </li>
+              </ul>
+              <p class="copy">Not sure? Turn both on. Each adds one column to your results.</p>
+            </details>
+            <p id="checks-results-location" class="copy"></p>
+            <p id="checks-message" class="message" data-tone="idle" aria-live="polite"></p>
+            <div class="actions">
+              <button id="run-checks" class="primary-button" type="button">
                 <span id="run-checks-spinner" class="loading-spinner" aria-hidden="true" hidden></span>
                 <span id="run-checks-label">Run checks</span>
               </button>
-              <p id="checks-message" class="form-message" aria-live="polite"></p>
             </div>
           </section>
 
           <section id="processing-section" class="processing-section" aria-labelledby="processing-title" hidden>
-            <div class="processing-card" role="status" aria-live="polite">
-              <h2 id="processing-title">Running checks</h2>
+            <div class="panel processing-card" role="status" aria-live="polite">
+              <h2 id="processing-title" class="section-title">Running checks</h2>
               <ol id="run-steps" class="run-steps" aria-hidden="true"></ol>
               <!-- The bar carries the value for assistive tech; the text beside it is
                    hidden from screen readers so a per-row update cannot flood this
@@ -191,28 +213,28 @@
               ><span id="processing-bar-fill" class="processing-bar-fill"></span></div>
               <p id="processing-percent" class="processing-percent" aria-hidden="true"></p>
               <p id="processing-count" class="processing-count" aria-hidden="true"></p>
-              <p id="processing-status" class="processing-status"></p>
+              <p id="processing-status" class="copy"></p>
               <p id="processing-privacy" class="processing-privacy"></p>
             </div>
           </section>
 
-          <section id="results-section" class="results-section" aria-labelledby="intro-title" hidden>
+          <section id="results-section" class="panel step-panel" aria-labelledby="intro-title" hidden>
             <div id="results-stats" class="results-stats" aria-live="polite"></div>
-            <div class="form-actions">
-              <button id="download-results" class="primary-button is-active" type="button">
+            <div id="download-message" class="message" data-tone="idle" aria-live="polite"></div>
+            <div class="actions">
+              <button id="start-over" class="secondary-button" type="button">Upload a different file</button>
+              <button id="download-results" class="primary-button" type="button">
                 <span id="download-spinner" class="loading-spinner" aria-hidden="true" hidden></span>
                 <span id="download-label">Export results (Excel)</span>
               </button>
-              <button id="start-over" class="secondary-button" type="button">Upload a different file</button>
             </div>
-            <div id="download-message" class="form-message" aria-live="polite"></div>
           </section>
         </div>
       </div>
 
-      <section id="settings-view" class="settings-view" aria-label="Settings" hidden>
+      <section id="settings-view" class="panel settings-view" aria-label="Settings" hidden>
         <div class="settings-view-head">
-          <h2>Settings</h2>
+          <h2 class="page-title">Settings</h2>
           <button
             id="settings-close"
             class="gear-button"
@@ -233,47 +255,35 @@
         </div>
         <div class="settings-column">
           <div class="settings-group">
-            <h3>Smarty credentials</h3>
-            <p class="settings-intro">
-              Credentials are encrypted on this device and never shown again.
-            </p>
-            <div class="settings-actions">
-              <button id="open-credentials" class="primary-button is-active" type="button">
-                Set Smarty credentials
-              </button>
-              <span id="credential-status" class="settings-check" aria-live="polite"></span>
+            <h3 class="section-title">Smarty credentials</h3>
+            <p class="copy">Your credentials are encrypted on this device and never shown again.</p>
+            <div class="actions actions--inline">
+              <button id="open-credentials" class="secondary-button" type="button">Set up Smarty credentials</button>
+              <span id="credential-status" class="status" data-tone="pending" aria-live="polite"></span>
             </div>
           </div>
 
           <div class="settings-group">
-            <h3>Map Columns</h3>
-            <p class="settings-intro">Pick the columns your files use.</p>
-            <div class="settings-actions">
-              <button id="open-columns" class="primary-button is-active" type="button">
-                Set map columns
-              </button>
+            <h3 class="section-title">Map columns</h3>
+            <p class="copy">Select the address fields/columns to run the validations.</p>
+            <div class="actions actions--inline">
+              <button id="open-columns" class="secondary-button" type="button">Set up map columns</button>
             </div>
           </div>
 
           <div class="settings-group">
-            <h3>USDA checks</h3>
-            <p class="settings-intro">
-              Pick the checks to turn on by default. Address checking always runs.
-            </p>
-            <div class="settings-actions">
-              <button id="open-checks" class="primary-button is-active" type="button">
-                Change USDA checks
-              </button>
+            <h3 class="section-title">USDA checks</h3>
+            <p class="copy">Pick the checks to turn on by default. The address check always runs.</p>
+            <div class="actions actions--inline">
+              <button id="open-checks" class="secondary-button" type="button">Change USDA checks</button>
             </div>
           </div>
 
           <div class="settings-group">
-            <h3>Appearance and accessibility</h3>
-            <p class="settings-intro">Choose a calm sunrise light theme or a pre-dawn dark theme.</p>
-            <div class="settings-actions">
-              <button id="open-appearance" class="primary-button is-active" type="button">
-                Change appearance
-              </button>
+            <h3 class="section-title">Appearance and accessibility</h3>
+            <p class="copy">Choose a calm sunrise light theme or a pre-dawn dark theme.</p>
+            <div class="actions actions--inline">
+              <button id="open-appearance" class="secondary-button" type="button">Change appearance</button>
             </div>
           </div>
         </div>
@@ -287,125 +297,135 @@
 
     <div
       id="credential-overlay"
-      class="welcome-overlay"
+      class="dialog-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="credential-dialog-title"
       hidden
     >
-      <div class="welcome-card settings-dialog-card">
-        <form id="settings-form" class="settings-form">
-          <div class="provider-fields">
-            <div class="provider-fields-head">
-              <h3 id="credential-dialog-title">Secret key</h3>
-              <a
-                href="https://www.smarty.com/account/keys?account_id=17430621318&amp;tab=secret"
-                target="_blank"
-                rel="noreferrer"
-              >Open Link to see Secrets</a>
-            </div>
-            <div id="credential-fields" class="credential-fields"></div>
+      <div class="panel dialog-card">
+        <form id="settings-form" class="dialog-body">
+          <h3 id="credential-dialog-title" class="section-title dialog-title">Smarty credentials</h3>
+          <p id="credential-dialog-status" class="status" data-tone="pending" aria-live="off"></p>
+          <!-- The address is set from the backend's constants, in one place. -->
+          <a id="open-smarty-keys" class="secondary-button smarty-keys-button" target="_blank" rel="noreferrer"
+            >Open my Smarty keys</a
+          >
+          <div id="credential-fields" class="credential-fields"></div>
+          <p class="copy">Enter both the Auth ID and the Auth Token. Saving replaces the saved credentials.</p>
+          <!-- Between the fields and the buttons, where the eye already is after pressing Save. -->
+          <p id="settings-message" class="message" data-tone="idle" aria-live="polite"></p>
+          <div class="actions">
+            <button id="clear-settings" class="secondary-button" type="button">Clear saved credentials</button>
+            <!-- Greyed out until both halves of the key are typed. -->
+            <button id="save-credentials" class="primary-button" type="submit" disabled>Save securely</button>
           </div>
-
-          <p class="settings-hint">Leave a field blank to keep its stored value.</p>
-          <div class="settings-actions">
-            <button class="primary-button is-active" type="submit">Save securely</button>
-            <button id="clear-settings" class="secondary-button" type="button">Clear stored credentials</button>
-          </div>
-          <p id="settings-message" class="settings-message" aria-live="polite"></p>
         </form>
       </div>
     </div>
 
     <div
       id="columns-overlay"
-      class="welcome-overlay"
+      class="dialog-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="columns-dialog-title"
       hidden
     >
-      <div class="welcome-card settings-dialog-card">
-        <form id="column-settings-form" class="settings-form">
-          <h3 id="columns-dialog-title">Map Columns</h3>
-          <p class="dialog-subtext">
-            Type the cell that holds each column's header, such as A1. vibeCheck reads whatever header sits at that
-            cell, so a saved setup keeps working when column names change between files.
+      <div class="panel dialog-card">
+        <form id="column-settings-form" class="dialog-body">
+          <h3 id="columns-dialog-title" class="section-title dialog-title">Map columns</h3>
+          <p class="copy">
+            Type the cell that holds each column's header, such as E1, not the first address under it (E2). vibeCheck
+            finds the header row itself and reads addresses from the rows below it.
           </p>
-
-          <h4 class="settings-subhead">Address</h4>
+          <p class="copy">
+            A saved setup keeps working when column names change between files, because vibeCheck reads whatever header
+            sits at that cell.
+          </p>
+          <h4 class="subhead">Address</h4>
           <div id="default-columns" class="cell-grid"></div>
-
-          <div class="settings-actions">
-            <button id="save-column-mapping" class="primary-button is-active" type="submit">
-              Save header cells
-            </button>
-            <button id="clear-column-mapping" class="secondary-button" type="button">
-              Clear saved cells
-            </button>
+          <p id="column-settings-message" class="message" data-tone="idle" aria-live="polite"></p>
+          <div class="actions">
+            <button id="clear-column-mapping" class="secondary-button" type="button">Clear saved cells</button>
+            <button id="save-column-mapping" class="primary-button" type="submit">Save header cells</button>
           </div>
-          <p id="column-settings-message" class="settings-message" aria-live="polite"></p>
         </form>
       </div>
     </div>
 
     <div
       id="checks-overlay"
-      class="welcome-overlay"
+      class="dialog-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="checks-dialog-title"
       hidden
     >
-      <div class="welcome-card settings-dialog-card">
-        <div class="settings-form">
-          <h3 id="checks-dialog-title">USDA checks</h3>
-          <p class="settings-hint">
-            These are pre-selected on the Checks step. You can still change them for a single run.
-          </p>
-          <label class="settings-toggle">
-            <input id="pref-rural" type="checkbox" />
-            <span><strong>Rural designation</strong><small>Check whether each address is in a rural area.</small></span>
-          </label>
-          <label class="settings-toggle">
-            <input id="pref-area" type="checkbox" />
-            <span><strong>Area eligibility</strong><small>Check each address against USDA area eligibility.</small></span>
-          </label>
+      <div class="panel dialog-card dialog-card--compact">
+        <div class="dialog-body">
+          <h3 id="checks-dialog-title" class="section-title dialog-title">USDA checks</h3>
+          <p class="copy">These are pre-selected on the Checks step. You can still change them for a single run.</p>
+          <div class="check-list">
+            <label class="check-row">
+              <input id="pref-rural" type="checkbox" />
+              <span
+                ><strong>USDA rural designation</strong
+                ><small>Turn on if you serve, or plan to serve, summer meals to go or by delivery.</small></span
+              >
+            </label>
+            <label class="check-row">
+              <input id="pref-area" type="checkbox" />
+              <span
+                ><strong>USDA area eligibility</strong
+                ><small>Turn on to see which addresses are in an area that qualifies for open summer meal sites.</small></span
+              >
+            </label>
+          </div>
+          <!-- Each change saves as it is made, so this only closes the dialog. -->
+          <div class="actions">
+            <button class="primary-button" type="button" data-dialog-close>Done</button>
+          </div>
         </div>
       </div>
     </div>
 
     <div
       id="appearance-overlay"
-      class="welcome-overlay"
+      class="dialog-overlay"
       role="dialog"
       aria-modal="true"
       aria-labelledby="appearance-dialog-title"
       hidden
     >
-      <div class="welcome-card settings-dialog-card">
-        <div class="settings-form">
-          <h3 id="appearance-dialog-title">Appearance and accessibility</h3>
-          <label for="theme-select">Theme</label>
-          <select id="theme-select" class="settings-select">
-            <option value="system">Match system</option>
-            <option value="light">Sunrise light</option>
-            <option value="dark">Pre-dawn dark</option>
-          </select>
-
-          <h4 class="settings-subhead">Accessibility</h4>
-          <label class="settings-toggle">
-            <input id="high-contrast" type="checkbox" />
-            <span><strong>Increase contrast</strong><small>Strengthen text and borders for readability.</small></span>
-          </label>
-          <label class="settings-toggle">
-            <input id="reduce-motion" type="checkbox" />
-            <span><strong>Reduce motion</strong><small>Turn off fade transitions between views.</small></span>
-          </label>
+      <div class="panel dialog-card dialog-card--compact">
+        <div class="dialog-body">
+          <h3 id="appearance-dialog-title" class="section-title dialog-title">Appearance and accessibility</h3>
+          <div class="field">
+            <label class="field-label" for="theme-select">Theme</label>
+            <select id="theme-select" class="select">
+              <option value="system">Match system</option>
+              <option value="light">Sunrise light</option>
+              <option value="dark">Pre-dawn dark</option>
+            </select>
+          </div>
+          <h4 class="subhead">Accessibility</h4>
+          <div class="check-list">
+            <label class="check-row">
+              <input id="high-contrast" type="checkbox" />
+              <span><strong>Increase contrast</strong><small>Strengthen text and borders for readability.</small></span>
+            </label>
+            <label class="check-row">
+              <input id="reduce-motion" type="checkbox" />
+              <span><strong>Reduce motion</strong><small>Turn off fade transitions between views.</small></span>
+            </label>
+          </div>
+          <div class="actions">
+            <button class="primary-button" type="button" data-dialog-close>Done</button>
+          </div>
         </div>
       </div>
     </div>
-
 
     <script type="module" src="./renderer.js"></script>
   </body>

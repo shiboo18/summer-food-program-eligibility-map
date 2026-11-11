@@ -20,12 +20,10 @@ const preferenceKeys = Object.keys(defaultPreferences) as readonly PreferenceKey
 export class PreferencesService {
   public constructor(private readonly store: PreferenceRecordStore) {}
 
-  /** Read every preference. */
   public async readAll(): Promise<AppPreferences> {
     return this.store.get();
   }
 
-  /** Read a single preference. */
   public async read<Key extends PreferenceKey>(key: Key): Promise<AppPreferences[Key]> {
     const preferences = await this.store.get();
     return preferences[key];

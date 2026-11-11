@@ -4,9 +4,8 @@ import type { GeocodeResult, LocationPrecision } from "../../types/eligibility.j
 import { ESRI_FIND_CANDIDATES_PATH } from "../../config/constants.js";
 
 /**
- * Resolves addresses with the free, anonymous Esri World Geocoder. Returns the
- * top candidate's coordinate together with its match score (0–100), which the
- * pipeline uses as its location-confidence signal.
+ * Resolves addresses with the free, anonymous Esri World Geocoder, returning the
+ * top candidate's coordinate, match score (0–100), and precision class.
  */
 export class EsriGeocoder implements Geocoder {
   public constructor(private readonly http: HttpGetClient) {}

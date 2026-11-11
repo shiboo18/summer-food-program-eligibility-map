@@ -62,8 +62,6 @@ describe("UsdaRuralZoneMapChecker", () => {
   });
 
   test("reads counts by layer id however the service orders the array", async () => {
-    /* The response shape is `layers[]` with `id` and `count`; the id, not the
-       array position, decides which criterion matched. */
     const checker = new UsdaRuralZoneMapChecker({
       get: vi.fn(async () => ({
         layers: [
@@ -127,8 +125,6 @@ describe("UsdaRuralZoneMapChecker", () => {
     expect(value(outcomes.get(2)).designation).toBe("rural");
   });
 
-  /* One request, one outcome: a duplicate takes the first row's failure rather
-     than retrying it four more times. */
   test("shares one failed lookup between duplicate rows rather than retrying", async () => {
     const http = {
       get: vi.fn(async () => {
@@ -144,7 +140,6 @@ describe("UsdaRuralZoneMapChecker", () => {
     expect(reason(outcomes.get(2))).toContain("could not be determined");
   });
 
-  /* A failed row is a value in the map, not a thrown error, so the sheet finishes. */
   test("reports an error payload against its own row and still checks the rest", async () => {
     const checker = new UsdaRuralZoneMapChecker({
       get: vi.fn(async (_path: string, params?: Record<string, string>) =>

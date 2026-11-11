@@ -145,8 +145,6 @@ describe("UsdaSummerMealBenefitChecker", () => {
     expect(value(outcomes.get(2)).eligibility).toBe("eligible");
   });
 
-  /* One request, one outcome: a duplicate takes the first row's failure rather
-     than retrying it. */
   test("shares one failed lookup between duplicate rows rather than retrying", async () => {
     const http = {
       get: vi.fn(async () => {
