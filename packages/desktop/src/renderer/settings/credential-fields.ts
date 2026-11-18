@@ -1,10 +1,7 @@
-import type { CredentialStatus } from "../../../../backend/dist/index.js";
-
-/** The Smarty secrets vibeCheck stores. */
-export type SmartyCredential = keyof CredentialStatus;
+import type { SmartyCredentialField } from "../../../../backend/dist/index.js";
 
 export interface CredentialFieldDescriptor {
-  readonly name: SmartyCredential;
+  readonly name: SmartyCredentialField;
   /** Label shown beside the field, matching the wording on Smarty's key page. */
   readonly label: string;
 }

@@ -23,9 +23,9 @@ describe("SettingsStore", () => {
     const filePath = join(directory, "settings.json");
     const store = new SettingsStore(filePath, protector);
 
-    const status = await store.save({ authId: "auth-id", authToken: "top-secret" });
+    await store.save({ authId: "auth-id", authToken: "top-secret" });
 
-    expect(status).toEqual({ smartyAuthId: true, smartyAuthToken: true });
+    await expect(store.getStatus()).resolves.toEqual({ smartyAuthId: true, smartyAuthToken: true });
     const contents = await readFile(filePath, "utf8");
     expect(contents).not.toContain("auth-id");
     expect(contents).not.toContain("top-secret");
@@ -54,9 +54,9 @@ describe("SettingsStore", () => {
     await writeFile(filePath, "{ not json", "utf8");
     const store = new SettingsStore(filePath, protector);
 
-    const status = await store.save({ authId: "auth-id", authToken: "top-secret" });
+    await store.save({ authId: "auth-id", authToken: "top-secret" });
 
-    expect(status).toEqual({ smartyAuthId: true, smartyAuthToken: true });
+    await expect(store.getStatus()).resolves.toEqual({ smartyAuthId: true, smartyAuthToken: true });
     expect(await store.getCredentials()).toEqual({ smartyAuthId: "auth-id", smartyAuthToken: "top-secret" });
   });
 

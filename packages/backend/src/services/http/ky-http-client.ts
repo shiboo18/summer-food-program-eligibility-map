@@ -32,21 +32,8 @@ export class KyHttpClient implements HttpGetClient {
   }
 
   public async get(path: string, params: Record<string, string> = {}): Promise<unknown> {
-    return this.send(async () => this.client.get(this.url(path), { searchParams: params }).json());
-  }
-
-  /**
-   * Joins explicitly rather than relying on ky's `baseUrl`, because URL
-   * resolution would drop the last path segment of a base that has no trailing
-   * slash — silently pointing a FeatureServer query at the wrong endpoint.
-   */
-  private url(path: string): string {
-    return `${this.baseUrl}${path.replace(/^\/+/, "")}`;
-  }
-
-  private async send(request: () => Promise<unknown>): Promise<unknown> {
     try {
-      return await request();
+      return await this.client.get(this.url(path), { searchParams: params }).json();
     } catch (error: unknown) {
       if (isHTTPError(error)) {
         throw new Error(`The service returned an unexpected response (HTTP ${error.response.status}).`, {
@@ -57,5 +44,14 @@ export class KyHttpClient implements HttpGetClient {
         cause: error,
       });
     }
+  }
+
+  /**
+   * Joins explicitly rather than relying on ky's `baseUrl`, because URL
+   * resolution would drop the last path segment of a base that has no trailing
+   * slash — silently pointing a FeatureServer query at the wrong endpoint.
+   */
+  private url(path: string): string {
+    return `${this.baseUrl}${path.replace(/^\/+/, "")}`;
   }
 }

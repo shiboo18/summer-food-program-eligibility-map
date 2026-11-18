@@ -30,11 +30,8 @@ export function isTrustedPrecision(precision: LocationPrecision): boolean {
  * well enough to be the right address. A rooftop match on the wrong street is
  * still wrong.
  */
-export function isTrustedGeocode(
-  geocode: GeocodeResult,
-  minimumScore: number = GEOCODE_MINIMUM_MATCH_SCORE,
-): boolean {
-  return isTrustedPrecision(geocode.precision) && geocode.score >= minimumScore;
+export function isTrustedGeocode(geocode: GeocodeResult): boolean {
+  return isTrustedPrecision(geocode.precision) && geocode.score >= GEOCODE_MINIMUM_MATCH_SCORE;
 }
 
 /**

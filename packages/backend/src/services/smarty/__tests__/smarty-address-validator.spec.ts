@@ -79,11 +79,7 @@ describe("SmartyAddressValidator", () => {
     const validator = new SmartyAddressValidator(credentials, () => ({ send }));
 
     await expect(validator.validate([address("1 Main St")])).resolves.toEqual([
-      {
-        status: "unverified",
-        inputAddress: address("1 Main St"),
-        messages: ["Smarty returned an incomplete address result."],
-      },
+      { status: "unverified" },
     ]);
   });
 
@@ -155,11 +151,7 @@ describe("SmartyAddressValidator", () => {
     }));
 
     await expect(validator.validate([address("1 Main St")])).resolves.toEqual([
-      {
-        status: "unverified",
-        inputAddress: address("1 Main St"),
-        messages: ["Smarty could not verify this address."],
-      },
+      { status: "unverified" },
     ]);
   });
 

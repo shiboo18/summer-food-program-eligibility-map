@@ -1,23 +1,23 @@
 import type {
   AppAccessibilitySettings,
-  CachedCheckSelection,
   CredentialCheck,
+  CredentialInput,
   CredentialStatus,
   Preferences,
-  SmartyCredentials,
+  SmartyCredentialField,
 } from "../../../../backend/dist/index.js";
 /* Leaf imports, so loading this panel cannot pull the backend's Node-only
    dependencies into the browser context. */
 import { addressFields, type AddressField } from "../../../../backend/dist/core/address-fields.js";
 import { followingCells, parseTypedCells } from "../../../../backend/dist/core/cell-mapping.js";
-import { toCredentialInput, toSmartyCredentials } from "../../../../backend/dist/core/smarty-credentials.js";
+import { toSmartyCredentials } from "../../../../backend/dist/core/smarty-credentials.js";
 import { SMARTY_API_KEYS_URL } from "../../../../backend/dist/config/constants.js";
 import { friendlyMessage } from "../../shared/text.js";
-import { createField, getRequiredElement } from "../dom.js";
+import { createField, getRequiredElement, showError } from "../dom.js";
 import type { Notifier } from "../notifier.js";
 import { latestOnly } from "../workflow/latest-only.js";
 import { singleFlight } from "../workflow/single-flight.js";
-import { credentialFields, type SmartyCredential } from "./credential-fields.js";
+import { credentialFields } from "./credential-fields.js";
 import { credentialHint } from "./credential-hints.js";
 import {
   credentialStatusView,
@@ -29,10 +29,8 @@ import { createDialog } from "./dialog.js";
 export interface SettingsPanelPorts {
   getPreferences(): Preferences;
   updatePreferences(patch: Partial<Preferences>): Promise<void>;
-  /** Adopt preferences returned by a direct bridge call, such as a delete. */
-  adoptPreferences(next: Preferences): void;
-  /** Mirror new check defaults onto the Checks step. */
-  applyCheckDefaults(selection: CachedCheckSelection): void;
+  /** Mirror the saved check defaults onto the Checks step. */
+  applyCheckDefaults(): void;
   /** Mirror newly saved header cells onto the Map columns step. */
   applyColumnDefaults(): void;
   /** Called whenever the stored key's state changes, so other screens can reflect it. */
@@ -59,10 +57,6 @@ export interface SettingsPanel {
 /** Long enough for any column letters plus a row, short enough to reject prose. */
 const cellInputMaxLength = 10;
 
-const cellLabels = new Map<AddressField, string>(
-  addressFields.map(({ field, label }): [AddressField, string] => [field, label]),
-);
-
 export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   const bridge = window.shareOurStrengths;
 
@@ -84,7 +78,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   const settingsForm = getRequiredElement<HTMLFormElement>("#settings-form");
   const settingsMessage = getRequiredElement<HTMLElement>("#settings-message");
   const saveCredentialsButton = getRequiredElement<HTMLButtonElement>("#save-credentials");
-  const credentialInputs = new Map<SmartyCredential, HTMLInputElement>();
+  const credentialInputs = new Map<SmartyCredentialField, HTMLInputElement>();
   /* Opens in the partner's own browser, where they are already signed in. */
   getRequiredElement<HTMLAnchorElement>("#open-smarty-keys").href = SMARTY_API_KEYS_URL;
 
@@ -93,7 +87,6 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   for (const { name, label } of credentialFields) {
     const input = document.createElement("input");
     input.id = `credential-${name}`;
-    input.name = name;
     input.type = "password";
     input.autocomplete = "off";
     input.spellcheck = false;
@@ -122,13 +115,13 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     input.addEventListener("change", coach(true));
   }
 
-  function typedCredentials(): SmartyCredentials | undefined {
-    return toSmartyCredentials(Object.fromEntries([...credentialInputs].map(([name, input]) => [name, input.value])));
+  function typedInput(): CredentialInput {
+    return Object.fromEntries([...credentialInputs].map(([name, input]) => [name, input.value]));
   }
 
   /* Save stays greyed out until both halves are typed: a save replaces the whole key. */
   function updateSaveAvailability(): void {
-    const ready = typedCredentials() !== undefined;
+    const ready = toSmartyCredentials(typedInput()) !== undefined;
     saveCredentialsButton.disabled = !ready;
   }
 
@@ -145,7 +138,6 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     closeLabel: "Close credentials",
     onOpen: (): void => {
       settingsMessage.textContent = "";
-      settingsMessage.dataset.tone = "idle";
       updateSaveAvailability();
       announceFrom(dialogStatusLine);
       credentialInputs.get(credentialFields[0]?.name ?? "smartyAuthId")?.focus();
@@ -157,10 +149,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
 
   /** Reports onto the message element of the dialog the failing control lives in. */
   function reportOn(surface: HTMLElement, fallback = settingsFailure): (error: unknown) => void {
-    return (error: unknown): void => {
-      surface.textContent = friendlyMessage(error, fallback);
-      surface.dataset.tone = "error";
-    };
+    return (error: unknown): void => showError(surface, error, fallback);
   }
 
   /** For controls with no message element of their own; a silent failure is worse. */
@@ -184,11 +173,8 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
 
   function showStoredCredentials(status: CredentialStatus): void {
     /* Stored secrets are never read back, so a placeholder stands in for them. */
-    for (const { name } of credentialFields) {
-      const input = credentialInputs.get(name);
-      if (input !== undefined) {
-        input.placeholder = status[name] ? "xxxxx" : "";
-      }
+    for (const [name, input] of credentialInputs) {
+      input.placeholder = status[name] ? "xxxxx" : "";
     }
     const wholeKey = credentialFields.every(({ name }) => status[name]);
     openCredentialsButton.textContent = wholeKey ? "Change Smarty credentials" : "Set up Smarty credentials";
@@ -215,18 +201,17 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     event.preventDefault();
     /* Save is disabled until both halves are typed, and a disabled default
        button blocks Enter too, so this only narrows the type. */
-    const credentials = typedCredentials();
-    if (credentials !== undefined) {
-      void saveCredentials(credentials);
+    if (toSmartyCredentials(typedInput()) !== undefined) {
+      void saveCredentials(typedInput());
     }
   });
 
   /* Smarty is asked before anything is stored, which can take seconds, so a second
      press is ignored rather than sending a second save. */
-  const saveCredentials = singleFlight(async (credentials: SmartyCredentials): Promise<void> => {
+  const saveCredentials = singleFlight(async (input: CredentialInput): Promise<void> => {
     saveCredentialsButton.disabled = true;
     try {
-      const { saved, check, status } = await bridge.settings.save(toCredentialInput(credentials));
+      const { saved, check, status } = await bridge.settings.save(input);
       if (!saved) {
         /* Nothing was stored, so the status still describes the key that is.
            The typed values stay in the form so a typo can be fixed. */
@@ -269,13 +254,11 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   const columnsMessage = getRequiredElement<HTMLElement>("#column-settings-message");
   const openColumnsButton = getRequiredElement<HTMLButtonElement>("#open-columns");
   const cellInputs = new Map<AddressField, HTMLInputElement>();
-  const requiredCells = new Set<AddressField>();
 
   const columnsDialog = createDialog("#columns-overlay", openColumnsButton, {
     closeLabel: "Close map columns",
     onOpen: (): void => {
       columnsMessage.textContent = "";
-      columnsMessage.dataset.tone = "idle";
     },
   });
 
@@ -291,9 +274,6 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
 
     addressCells.append(createField(input, label, optional));
     cellInputs.set(field, input);
-    if (!optional) {
-      requiredCells.add(field);
-    }
   }
 
   /** Typing the first cell fills the rest, leaving typed cells alone. */
@@ -315,7 +295,6 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   function renderCellFields(): void {
     addressCells.replaceChildren();
     cellInputs.clear();
-    requiredCells.clear();
 
     for (const { field, label, optional } of addressFields) {
       addCellField(field, label, optional);
@@ -331,11 +310,11 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
   columnsForm.addEventListener("submit", (event): void => {
     event.preventDefault();
     const result = parseTypedCells(
-      [...cellInputs].map(([field, input]) => ({
+      addressFields.map(({ field, label, optional }) => ({
         field,
-        label: cellLabels.get(field) ?? field,
-        required: requiredCells.has(field),
-        value: input.value,
+        label,
+        required: !optional,
+        value: cellInputs.get(field)?.value ?? "",
       })),
     );
 
@@ -359,11 +338,9 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
     if (!ports.notifier.confirm("Clear the saved header cells?")) {
       return;
     }
-    void bridge.preferences
-      .remove("columnMapping")
-      .then((stored): void => {
-        ports.adoptPreferences(stored);
-        renderCellFields();
+    void ports
+      .updatePreferences({ columnMapping: {} })
+      .then((): void => {
         ports.applyColumnDefaults();
         columnsDialog.close();
         ports.notifier.success("Saved cells cleared.");
@@ -384,7 +361,7 @@ export function createSettingsPanel(ports: SettingsPanelPorts): SettingsPanel {
       const next = { ...ports.getPreferences().checkSelection, [name]: input.checked };
       void ports
         .updatePreferences({ checkSelection: next })
-        .then((): void => ports.applyCheckDefaults(ports.getPreferences().checkSelection))
+        .then((): void => ports.applyCheckDefaults())
         .catch(reportError);
     });
   }

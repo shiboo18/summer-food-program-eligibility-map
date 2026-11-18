@@ -32,7 +32,6 @@ export interface CredentialSaveResult {
 export interface ExportResult {
   readonly canceled: boolean;
   readonly filePath?: string;
-  readonly rowsAnnotated?: number;
 }
 
 declare global {
@@ -68,7 +67,6 @@ declare global {
       readonly preferences: {
         get(): Promise<Preferences>;
         update(patch: Partial<Preferences>): Promise<Preferences>;
-        remove(key: keyof Preferences): Promise<Preferences>;
         getSystemTheme(): Promise<"light" | "dark">;
         onSystemThemeChange(listener: (theme: "light" | "dark") => void): () => void;
       };

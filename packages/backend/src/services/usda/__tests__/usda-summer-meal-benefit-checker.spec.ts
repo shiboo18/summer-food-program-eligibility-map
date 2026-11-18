@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 
 import type { Address } from "../../../types/address.js";
-import type { CheckOutcome, LocatedRow } from "../../../types/eligibility.js";
+import type { LocatedRow } from "../../../types/eligibility.js";
 import { UsdaSummerMealBenefitChecker } from "../usda-summer-meal-benefit-checker.js";
 
 const address: Address = {
@@ -13,7 +13,7 @@ const address: Address = {
 };
 
 function located(rowNumber: number, lat = 35.7968, lng = -88.2646): LocatedRow {
-  return { rowNumber, address, geocode: { point: { lat, lng }, score: 100, precision: "rooftop", matchedAddress: "1 MAIN ST" } };
+  return { rowNumber, address, geocode: { point: { lat, lng }, score: 100, precision: "rooftop" } };
 }
 
 function httpReturning(payload: unknown) {
@@ -24,90 +24,30 @@ function featurePayload(attributes: Record<string, unknown>): unknown {
   return { features: [{ attributes }] };
 }
 
-function value<Value>(outcome: CheckOutcome<Value> | undefined): Value {
-  if (outcome === undefined || !outcome.ok) {
-    throw new Error(`Expected a value but got ${JSON.stringify(outcome)}`);
-  }
-  return outcome.value;
-}
-
-function reason(outcome: CheckOutcome<unknown> | undefined): string {
-  if (outcome === undefined || outcome.ok) {
-    throw new Error(`Expected a failure but got ${JSON.stringify(outcome)}`);
-  }
-  return outcome.reason;
-}
-
 describe("UsdaSummerMealBenefitChecker", () => {
-  test("maps the independently-eligible (orange) value with evidence fields", async () => {
-    const checker = new UsdaSummerMealBenefitChecker(
-      httpReturning(
-        featurePayload({
-          FY26_Eligibility: "Eligible",
-          GEOID: "470370137011",
-          County: "Davidson",
-          BGPct18: 66.7,
-          TractPct18: 79.2,
-          PctPovBG_all: null,
-        }),
-      ),
-    );
+  test.each([
+    { field: "Eligible", eligibility: "eligible" },
+    { field: "Averaged Eligible", eligibility: "averaged-eligible" },
+    { field: "Not Eligible", eligibility: "not-eligible" },
+    { field: "Something Else", eligibility: "unknown" },
+  ])("when the block group reads $field, the row is $eligibility", async ({ field, eligibility }) => {
+    const checker = new UsdaSummerMealBenefitChecker(httpReturning(featurePayload({ FY26_Eligibility: field })));
 
     const outcomes = await checker.checkBenefitBatch([located(1)]);
 
-    expect(value(outcomes.get(1))).toEqual({
-      eligibility: "eligible",
-      geoid: "470370137011",
-      county: "Davidson",
-      blockGroupPct: 66.7,
-      tractPct: 79.2,
-      averagedPct: undefined,
-    });
+    expect(outcomes.get(1)).toEqual({ eligibility });
   });
 
-  test("maps the averaged-eligible (blue) value", async () => {
-    const checker = new UsdaSummerMealBenefitChecker(
-      httpReturning(featurePayload({ FY26_Eligibility: "Averaged Eligible", TractPct18: 48.3, PctPovBG_all: 0.57 })),
-    );
-
-    const result = value((await checker.checkBenefitBatch([located(1)])).get(1));
-
-    expect(result.eligibility).toBe("averaged-eligible");
-    expect(result.tractPct).toBe(48.3);
-    expect(result.averagedPct).toBe(0.57);
-  });
-
-  test("maps the not-eligible (gray) value", async () => {
-    const checker = new UsdaSummerMealBenefitChecker(
-      httpReturning(featurePayload({ FY26_Eligibility: "Not Eligible" })),
-    );
-
-    const outcomes = await checker.checkBenefitBatch([located(1)]);
-
-    expect(value(outcomes.get(1))).toMatchObject({ eligibility: "not-eligible" });
-  });
-
-  /* Nothing containing the point is an answer, not a failure, so it stays on the
-     value arm. */
+  /* Nothing containing the point is an answer, not a failure. */
   test("returns unknown when no block group contains the point", async () => {
     const checker = new UsdaSummerMealBenefitChecker(httpReturning({ features: [] }));
 
     const outcomes = await checker.checkBenefitBatch([located(1)]);
 
-    expect(value(outcomes.get(1))).toEqual({ eligibility: "unknown" });
+    expect(outcomes.get(1)).toEqual({ eligibility: "unknown" });
   });
 
-  test("returns unknown for an unrecognized eligibility value", async () => {
-    const checker = new UsdaSummerMealBenefitChecker(
-      httpReturning(featurePayload({ FY26_Eligibility: "Something Else" })),
-    );
-
-    const outcomes = await checker.checkBenefitBatch([located(1)]);
-
-    expect(value(outcomes.get(1))).toMatchObject({ eligibility: "unknown" });
-  });
-
-  test("requests the eligibility and evidence fields for the point", async () => {
+  test("requests only the eligibility field for the point", async () => {
     const http = httpReturning({ features: [] });
     const checker = new UsdaSummerMealBenefitChecker(http);
 
@@ -118,7 +58,7 @@ describe("UsdaSummerMealBenefitChecker", () => {
       geometryType: "esriGeometryPoint",
       inSR: "4326",
       spatialRel: "esriSpatialRelIntersects",
-      outFields: "FY26_Eligibility,GEOID,County,BGPct18,TractPct18,PctPovBG_all",
+      outFields: "FY26_Eligibility",
       returnGeometry: "false",
       f: "json",
     });
@@ -141,8 +81,8 @@ describe("UsdaSummerMealBenefitChecker", () => {
     const outcomes = await checker.checkBenefitBatch([located(1), located(2)]);
 
     expect(http.get).toHaveBeenCalledTimes(1);
-    expect(value(outcomes.get(1)).eligibility).toBe("eligible");
-    expect(value(outcomes.get(2)).eligibility).toBe("eligible");
+    expect(outcomes.get(1)).toEqual({ eligibility: "eligible" });
+    expect(outcomes.get(2)).toEqual({ eligibility: "eligible" });
   });
 
   test("shares one failed lookup between duplicate rows rather than retrying", async () => {
@@ -156,11 +96,13 @@ describe("UsdaSummerMealBenefitChecker", () => {
     const outcomes = await checker.checkBenefitBatch([located(1), located(2)]);
 
     expect(http.get).toHaveBeenCalledTimes(1);
-    expect(reason(outcomes.get(1))).toContain("could not be determined");
-    expect(reason(outcomes.get(2))).toContain("could not be determined");
+    expect([...outcomes]).toEqual([
+      [1, undefined],
+      [2, undefined],
+    ]);
   });
 
-  test("reports an error payload against its own row and still checks the rest", async () => {
+  test("when the service reports an error for one row, leaves that row without a result and checks the rest", async () => {
     const checker = new UsdaSummerMealBenefitChecker({
       get: vi.fn(async (_path: string, params?: Record<string, string>) =>
         params?.geometry === "-88.2646,35.7968"
@@ -171,21 +113,8 @@ describe("UsdaSummerMealBenefitChecker", () => {
 
     const outcomes = await checker.checkBenefitBatch([located(1), located(2, 36, -87)]);
 
-    expect(reason(outcomes.get(1))).toContain("service reported an error");
-    expect(value(outcomes.get(2)).eligibility).toBe("eligible");
-  });
-
-  test("reports a transport failure without leaking its detail", async () => {
-    const checker = new UsdaSummerMealBenefitChecker({
-      get: vi.fn(async () => {
-        throw new Error("socket hang up");
-      }),
-    });
-
-    const outcomes = await checker.checkBenefitBatch([located(1)]);
-
-    expect(reason(outcomes.get(1))).toContain("could not be determined");
-    expect(reason(outcomes.get(1))).not.toContain("socket hang up");
+    expect(outcomes.get(1)).toBeUndefined();
+    expect(outcomes.get(2)).toEqual({ eligibility: "eligible" });
   });
 
   test("counts progress once per row", async () => {

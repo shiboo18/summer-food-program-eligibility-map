@@ -13,30 +13,11 @@ import type {
   RunProgress,
   ValidationReport,
 } from "../../../backend/dist/index.js";
-
-/** Main-process projections that exist only for this bridge. */
-interface SpreadsheetSelection {
-  readonly fileName: string;
-  readonly headers: readonly string[];
-  readonly headerRowNumber: number;
-  readonly rowCount: number;
-}
-
-interface CredentialSaveResult {
-  readonly saved: boolean;
-  readonly check: CredentialCheck;
-  readonly status: CredentialStatus;
-}
-
-interface ExportResult {
-  readonly canceled: boolean;
-  readonly filePath?: string;
-  readonly rowsAnnotated?: number;
-}
+import type { CredentialSaveResult, ExportResult, SpreadsheetSelection } from "../renderer/runtime-api.js";
 
 const runtimeInfo = Object.freeze({
-  electron: process.versions.electron ?? "unknown",
-  chromium: process.versions.chrome ?? "unknown",
+  electron: process.versions.electron,
+  chromium: process.versions.chrome,
   node: process.versions.node,
   platform: process.platform,
 });
@@ -80,7 +61,6 @@ contextBridge.exposeInMainWorld(
       get: () => ipcRenderer.invoke("preferences:get") as Promise<Preferences>,
       update: (patch: Partial<Preferences>) =>
         ipcRenderer.invoke("preferences:update", patch) as Promise<Preferences>,
-      remove: (key: string) => ipcRenderer.invoke("preferences:remove", key) as Promise<Preferences>,
       getSystemTheme: () => ipcRenderer.invoke("preferences:system-theme") as Promise<"light" | "dark">,
       onSystemThemeChange: (listener: (theme: "light" | "dark") => void) => {
         const handler = (_event: unknown, theme: "light" | "dark"): void => listener(theme);

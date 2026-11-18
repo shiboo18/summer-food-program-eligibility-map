@@ -24,11 +24,9 @@ export interface VerifiedLocation {
 
 export interface AddressVerificationResult {
   readonly status: AddressVerificationStatus;
-  readonly inputAddress: Address;
   readonly normalizedAddress?: Address;
   /** Smarty's rooftop/ZIP coordinate for the address, when it returned one. */
   readonly location?: VerifiedLocation;
-  readonly messages: readonly string[];
 }
 
 /** One row's verification outcome, carried to the results export. */
@@ -38,16 +36,9 @@ export interface RowVerification {
   readonly standardizedAddress?: string;
 }
 
-export interface FailedAddress {
-  readonly rowNumber: number;
-  readonly address: string;
-  readonly reason: string;
-}
-
+/** How many rows Smarty verified as typed, corrected, or could not verify (set-aside rows included). */
 export interface ValidationReport {
-  readonly fileName: string;
-  readonly total: number;
   readonly verified: number;
   readonly corrected: number;
-  readonly failures: readonly FailedAddress[];
+  readonly failed: number;
 }

@@ -4,8 +4,6 @@ import type { Tone } from "../tone.js";
 /** The stored key's state on screen: Smarty's last answer, or a check under way. */
 export type CredentialDisplayState = CredentialCheck | "checking";
 
-/** How the status reads at a glance; styling keys off this. */
-
 export interface CredentialStatusView {
   /** The status line in Settings and in the credentials dialog. */
   readonly text: string;

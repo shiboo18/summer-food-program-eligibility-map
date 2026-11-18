@@ -1,4 +1,4 @@
-import type { SmartyCredential } from "./credential-fields.js";
+import type { SmartyCredentialField } from "../../../../backend/dist/index.js";
 
 /* Partners type their Smarty sign-in here instead of the secret key, so an email
    address is the mistake worth catching the moment it appears. */
@@ -19,7 +19,7 @@ const authIdShape = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{1
  * @param settled true once the partner has left the field, so a half-typed
  *   value is not mistaken for a wrong one.
  */
-export function credentialHint(field: SmartyCredential, value: string, settled: boolean): string | undefined {
+export function credentialHint(field: SmartyCredentialField, value: string, settled: boolean): string | undefined {
   const typed = value.trim();
   if (typed.includes("@")) {
     return emailHint;

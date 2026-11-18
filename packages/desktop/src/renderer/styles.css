@@ -211,7 +211,6 @@ ul {
 
 /* One width for every button in an inline row, label at the left, so a column
    of them reads as an aligned set rather than a ragged edge. */
-.actions--inline > .primary-button,
 .actions--inline > .secondary-button {
   width: min(100%, 18rem);
   justify-content: flex-start;
@@ -332,7 +331,6 @@ ul {
 
 .check-row small {
   margin-top: 2px;
-  color: var(--text-soft);
   font-weight: 400;
 }
 
@@ -433,10 +431,6 @@ ul {
   flex: 3 1 0;
 }
 
-.app-header {
-  order: 0;
-}
-
 .home-view,
 .workspace,
 .settings-view {
@@ -446,10 +440,6 @@ ul {
 .app-shell::after {
   order: 3;
   flex: 7 1 0;
-}
-
-.app-footer {
-  order: 4;
 }
 
 .app-header {
@@ -545,6 +535,7 @@ ul {
 /* Held to the bottom edge of the shell, so a short view and a tall one put it
    in the same place. */
 .app-footer {
+  order: 4;
   display: flex;
   justify-content: space-between;
   gap: 18px;
@@ -581,12 +572,6 @@ ul {
   border-radius: var(--radius-lg);
   background: var(--surface);
   box-shadow: var(--shadow-raised);
-}
-
-.home-step .step-badge {
-  border-color: var(--accent);
-  color: var(--accent-text);
-  background: var(--accent);
 }
 
 /* Workflow: the steps list beside the current step. */
@@ -656,6 +641,7 @@ ul {
   background: var(--page-accent);
 }
 
+.home-step .step-badge,
 .workflow-step[data-state="active"] .step-badge {
   border-color: var(--accent);
   color: var(--accent-text);
@@ -708,7 +694,6 @@ ul {
 }
 
 .mapping-form > .copy,
-.mapping-form > .message,
 .mapping-form > .actions {
   grid-column: 1 / -1;
 }
@@ -823,14 +808,8 @@ ul {
 
 /* Once rows are reported the bar holds the fraction done, easing to each new position. */
 .processing-bar[data-state="determinate"] .processing-bar-fill {
-  width: 0;
   animation: none;
-  opacity: 1;
   transition: width var(--motion-progress);
-}
-
-[data-motion="reduced"] .processing-bar-fill {
-  animation: none;
 }
 
 .processing-percent {
@@ -839,10 +818,6 @@ ul {
   font-weight: 700;
   font-variant-numeric: tabular-nums;
   line-height: 1;
-}
-
-.processing-percent:empty {
-  display: none;
 }
 
 .processing-count {

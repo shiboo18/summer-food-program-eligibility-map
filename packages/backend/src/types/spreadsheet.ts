@@ -1,4 +1,5 @@
 import type { Address } from "./address.js";
+import type { EligibilityChecks } from "./eligibility.js";
 
 export interface SpreadsheetSummary {
   readonly filePath: string;
@@ -28,14 +29,10 @@ export interface AddressRow {
   readonly address: Address;
 }
 
-export interface SkippedRow {
-  readonly rowNumber: number;
-  readonly reason: string;
-}
-
 export interface AddressRowsResult {
   readonly rows: readonly AddressRow[];
-  readonly skipped: readonly SkippedRow[];
+  /** Row numbers set aside because their mapped cells do not read as an address. */
+  readonly skipped: readonly number[];
 }
 
 /** Sponsor-readable deliverability verdict written into the results column. */
@@ -89,21 +86,10 @@ export interface ResultAnnotation {
   readonly area?: AreaLabel;
 }
 
-/** Header names for the appended result columns. */
-export interface ResultColumns {
-  readonly standardized: string;
-  readonly deliverability: string;
-  readonly location: string;
-  readonly rural: string;
-  readonly area: string;
-}
-
 /** Which result columns to write, and where to write them. */
 export interface ResultColumnOptions {
-  readonly columns: ResultColumns;
-  /** Whether to write the rural and area columns, i.e. whether those checks ran. */
-  readonly includeRural: boolean;
-  readonly includeArea: boolean;
+  /** The checks that ran; the rural and area columns are written only for these. */
+  readonly checks: EligibilityChecks;
   /** Where to write the annotated copy. The partner's original is never written to. */
   readonly outputPath: string;
 }

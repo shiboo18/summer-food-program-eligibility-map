@@ -1,13 +1,8 @@
 import { getRequiredElement } from "../dom.js";
 
 export interface Dialog {
-  /**
-   * Show the dialog. Pass the control that asked for it when that is not the
-   * registered trigger, so closing returns focus there rather than to a control
-   * on a screen the user has left.
-   */
-  open(returnFocusTo?: HTMLElement): void;
-  /** Hide the dialog, returning focus to whatever opened it. */
+  open(): void;
+  /** Hide the dialog, returning focus to its trigger. */
   close(): void;
 }
 
@@ -56,10 +51,11 @@ document.addEventListener("keydown", (event): void => {
 
 const svgNamespace = "http://www.w3.org/2000/svg";
 
-function createCloseButton(label: string): HTMLButtonElement {
+/** Create the round close (×) button that dialogs and the Settings page share. */
+export function createCloseButton(label: string): HTMLButtonElement {
   const button = document.createElement("button");
   button.type = "button";
-  button.className = "gear-button dialog-close";
+  button.className = "gear-button";
   button.setAttribute("aria-label", label);
   button.title = label;
 
@@ -88,19 +84,18 @@ function createCloseButton(label: string): HTMLButtonElement {
  */
 export function createDialog(overlayId: string, trigger: HTMLButtonElement, options: DialogOptions): Dialog {
   const overlay = getRequiredElement<HTMLElement>(overlayId);
-  let returnFocusTo: HTMLElement = trigger;
   const close = (): void => {
     overlay.hidden = true;
     options.onClose?.();
-    returnFocusTo.focus();
+    trigger.focus();
   };
-  const open = (opener: HTMLElement = trigger): void => {
-    returnFocusTo = opener;
+  const open = (): void => {
     overlay.hidden = false;
     options.onOpen?.();
   };
 
   const closeButton = createCloseButton(options.closeLabel);
+  closeButton.classList.add("dialog-close");
   closeButton.addEventListener("click", close);
   /* A "Done" button in the markup closes its dialog without wiring of its own. */
   for (const done of overlay.querySelectorAll<HTMLButtonElement>("[data-dialog-close]")) {
@@ -108,8 +103,7 @@ export function createDialog(overlayId: string, trigger: HTMLButtonElement, opti
   }
   overlay.querySelector(".dialog-card")?.prepend(closeButton);
 
-  /* Wrapped: a click listener would otherwise pass its event as the opener. */
-  trigger.addEventListener("click", (): void => open());
+  trigger.addEventListener("click", open);
   overlay.addEventListener("click", (event): void => {
     if (event.target === overlay) {
       close();

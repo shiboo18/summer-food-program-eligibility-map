@@ -1,7 +1,7 @@
 import { describe, expect, test, vi } from "vitest";
 
 import type { Address } from "../../../types/address.js";
-import type { CheckOutcome, LocatedRow } from "../../../types/eligibility.js";
+import type { LocatedRow } from "../../../types/eligibility.js";
 import { UsdaRuralZoneMapChecker } from "../usda-rural-zone-map-checker.js";
 
 const address: Address = {
@@ -14,7 +14,7 @@ const address: Address = {
 
 /** A located row at a distinct coordinate, so a geometry-keyed stub can tell rows apart. */
 function located(rowNumber: number, lat = 35.7968, lng = -88.2646): LocatedRow {
-  return { rowNumber, address, geocode: { point: { lat, lng }, score: 100, precision: "rooftop", matchedAddress: "1 MAIN ST" } };
+  return { rowNumber, address, geocode: { point: { lat, lng }, score: 100, precision: "rooftop" } };
 }
 
 /** Stubs one service-level `layers[]` response, count per layer id in order. */
@@ -24,41 +24,13 @@ function httpReturningLayers(counts: readonly number[]) {
   };
 }
 
-function value<Value>(outcome: CheckOutcome<Value> | undefined): Value {
-  if (outcome === undefined || !outcome.ok) {
-    throw new Error(`Expected a value but got ${JSON.stringify(outcome)}`);
-  }
-  return outcome.value;
-}
-
-function reason(outcome: CheckOutcome<unknown> | undefined): string {
-  if (outcome === undefined || outcome.ok) {
-    throw new Error(`Expected a failure but got ${JSON.stringify(outcome)}`);
-  }
-  return outcome.reason;
-}
-
 describe("UsdaRuralZoneMapChecker", () => {
-  test("is rural when any layer intersects, and reports the matched criteria", async () => {
+  test("is rural when any layer intersects", async () => {
     const checker = new UsdaRuralZoneMapChecker(httpReturningLayers([0, 0, 0, 0, 1]));
 
     const outcomes = await checker.checkZoneBatch([located(1)]);
 
-    expect(value(outcomes.get(1))).toEqual({
-      designation: "rural",
-      matchedCriteria: ["Census tract rural designation"],
-    });
-  });
-
-  test("collects every matched criterion in configured layer order", async () => {
-    const checker = new UsdaRuralZoneMapChecker(httpReturningLayers([1, 1, 0, 0, 0]));
-
-    const outcomes = await checker.checkZoneBatch([located(1)]);
-
-    expect(value(outcomes.get(1)).matchedCriteria).toEqual([
-      "MSA — not part of a Census urban area",
-      "County not part of an MSA",
-    ]);
+    expect(outcomes.get(1)).toEqual({ designation: "rural" });
   });
 
   test("reads counts by layer id however the service orders the array", async () => {
@@ -74,10 +46,15 @@ describe("UsdaRuralZoneMapChecker", () => {
 
     const outcomes = await checker.checkZoneBatch([located(1)]);
 
-    expect(value(outcomes.get(1)).matchedCriteria).toEqual([
-      "County not part of an MSA",
-      "Census tract rural designation",
-    ]);
+    expect(outcomes.get(1)).toEqual({ designation: "rural" });
+  });
+
+  test("ignores a count for a layer it did not ask about", async () => {
+    const checker = new UsdaRuralZoneMapChecker({ get: vi.fn(async () => ({ layers: [{ id: 9, count: 1 }] })) });
+
+    const outcomes = await checker.checkZoneBatch([located(1)]);
+
+    expect(outcomes.get(1)).toEqual({ designation: "not-rural" });
   });
 
   test("is not rural when no layer intersects", async () => {
@@ -85,7 +62,7 @@ describe("UsdaRuralZoneMapChecker", () => {
 
     const outcomes = await checker.checkZoneBatch([located(1)]);
 
-    expect(value(outcomes.get(1))).toEqual({ designation: "not-rural", matchedCriteria: [] });
+    expect(outcomes.get(1)).toEqual({ designation: "not-rural" });
   });
 
   test("asks all five layers in one layerDefs point query", async () => {
@@ -121,8 +98,8 @@ describe("UsdaRuralZoneMapChecker", () => {
     const outcomes = await checker.checkZoneBatch([located(1), located(2)]);
 
     expect(http.get).toHaveBeenCalledTimes(1);
-    expect(value(outcomes.get(1)).designation).toBe("rural");
-    expect(value(outcomes.get(2)).designation).toBe("rural");
+    expect(outcomes.get(1)).toEqual({ designation: "rural" });
+    expect(outcomes.get(2)).toEqual({ designation: "rural" });
   });
 
   test("shares one failed lookup between duplicate rows rather than retrying", async () => {
@@ -136,11 +113,13 @@ describe("UsdaRuralZoneMapChecker", () => {
     const outcomes = await checker.checkZoneBatch([located(1), located(2)]);
 
     expect(http.get).toHaveBeenCalledTimes(1);
-    expect(reason(outcomes.get(1))).toContain("could not be determined");
-    expect(reason(outcomes.get(2))).toContain("could not be determined");
+    expect([...outcomes]).toEqual([
+      [1, undefined],
+      [2, undefined],
+    ]);
   });
 
-  test("reports an error payload against its own row and still checks the rest", async () => {
+  test("when the service reports an error for one row, leaves that row without a result and checks the rest", async () => {
     const checker = new UsdaRuralZoneMapChecker({
       get: vi.fn(async (_path: string, params?: Record<string, string>) =>
         params?.geometry === "-88.2646,35.7968"
@@ -151,29 +130,17 @@ describe("UsdaRuralZoneMapChecker", () => {
 
     const outcomes = await checker.checkZoneBatch([located(1), located(2, 36, -87)]);
 
-    expect(reason(outcomes.get(1))).toContain("service reported an error");
-    expect(value(outcomes.get(2)).designation).toBe("rural");
+    expect(outcomes.get(1)).toBeUndefined();
+    expect(outcomes.get(2)).toEqual({ designation: "rural" });
   });
 
-  test("reports a malformed response without a layers array as a failure", async () => {
+  test("treats a malformed response without a layers array as a failure, not as not rural", async () => {
     const checker = new UsdaRuralZoneMapChecker({ get: vi.fn(async () => ({ count: 1 })) });
 
     const outcomes = await checker.checkZoneBatch([located(1)]);
 
-    expect(reason(outcomes.get(1))).toContain("unexpected response");
-  });
-
-  test("reports a transport failure without leaking its detail", async () => {
-    const checker = new UsdaRuralZoneMapChecker({
-      get: vi.fn(async () => {
-        throw new Error("socket hang up");
-      }),
-    });
-
-    const outcomes = await checker.checkZoneBatch([located(1)]);
-
-    expect(reason(outcomes.get(1))).toContain("could not be determined");
-    expect(reason(outcomes.get(1))).not.toContain("socket hang up");
+    expect(outcomes.has(1)).toBe(true);
+    expect(outcomes.get(1)).toBeUndefined();
   });
 
   test("counts progress once per row", async () => {

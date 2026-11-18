@@ -5,13 +5,7 @@
 
 import type { Address, AddressVerificationResult } from "./types/address.js";
 import type { ResolvedSmartyCredentials, SmartyCredentials } from "./types/credentials.js";
-import type {
-  AreaEligibilityResult,
-  CheckOutcome,
-  GeocodeResult,
-  LocatedRow,
-  RuralResult,
-} from "./types/eligibility.js";
+import type { AreaEligibilityResult, GeocodeResult, LocatedRow, RuralResult } from "./types/eligibility.js";
 import type { ProgressReporter } from "./types/progress.js";
 import type {
   AddressRowsResult,
@@ -76,22 +70,23 @@ export interface Geocoder {
  * Checks located rows against the USDA rural zone map.
  *
  * Batch rather than per-point because a sheet is the unit of work: the
- * implementation paces its own requests and returns one outcome per row, keyed
- * by row number. Rows absent from the returned map were not handed to it.
+ * implementation paces its own requests and returns one value per row, keyed by
+ * row number. A row whose check failed maps to `undefined`, so one bad row
+ * cannot stop the sheet.
  */
 export interface RuralZoneChecker {
   checkZoneBatch(
     rows: readonly LocatedRow[],
     onProgress?: ProgressReporter,
-  ): Promise<ReadonlyMap<number, CheckOutcome<RuralResult>>>;
+  ): Promise<ReadonlyMap<number, RuralResult | undefined>>;
 }
 
-/** Checks located rows against the USDA summer meal benefit (area eligibility) map. */
+/** Checks located rows against the USDA summer meal benefit (area eligibility) map, as {@link RuralZoneChecker}. */
 export interface SummerMealBenefitChecker {
   checkBenefitBatch(
     rows: readonly LocatedRow[],
     onProgress?: ProgressReporter,
-  ): Promise<ReadonlyMap<number, CheckOutcome<AreaEligibilityResult>>>;
+  ): Promise<ReadonlyMap<number, AreaEligibilityResult | undefined>>;
 }
 
 /**

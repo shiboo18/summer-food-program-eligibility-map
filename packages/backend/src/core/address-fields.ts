@@ -1,9 +1,9 @@
 import type { ColumnMapping } from "../types/spreadsheet.js";
-import type { CachedColumnMapping } from "../types/preferences.js";
+import type { CachedColumnMapping, mappingFields } from "../types/preferences.js";
 import { cellAtColumn, headerAtCell } from "./cell-reference.js";
 
 /** The address fields a spreadsheet column can be mapped to. */
-export type AddressField = "line1" | "line2" | "city" | "state" | "postalCode";
+export type AddressField = (typeof mappingFields)[number];
 
 export interface AddressFieldDescriptor {
   readonly field: AddressField;
@@ -17,8 +17,8 @@ export interface AddressFieldDescriptor {
 
 /**
  * The address fields in form order. This table drives the mapping selects, the
- * column guesses, the Settings dropdowns, and the mapping sent to the backend, so
- * adding a field is an edit here plus its select in index.html.
+ * column guesses, the Settings cells, and the mapping sent to the backend, so
+ * adding a field is an edit here.
  */
 export const addressFields: readonly AddressFieldDescriptor[] = [
   { field: "line1", label: "Street address", optional: false, candidates: ["address", "street", "line1"] },

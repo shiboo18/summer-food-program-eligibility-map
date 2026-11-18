@@ -33,7 +33,7 @@ function createSpreadsheet(): SpreadsheetReader & SpreadsheetWriter {
         { rowNumber: 3, address: address("2 Corrected St") },
         { rowNumber: 4, address: address("3 Failed St") },
       ],
-      skipped: [{ rowNumber: 5, reason: "Missing street, city, state, or ZIP code." }],
+      skipped: [5],
     }),
     annotateResults: vi.fn(async () => undefined),
   };
@@ -41,81 +41,57 @@ function createSpreadsheet(): SpreadsheetReader & SpreadsheetWriter {
 
 const validator: AddressValidator = {
   validate: async (addresses) =>
-    addresses.map((inputAddress, index) => {
+    addresses.map((_address, index) => {
       if (index === 0) {
-        return { status: "verified", inputAddress, messages: [], location: { lat: 30.27, lng: -97.74, score: 100, precision: "rooftop" } };
+        return { status: "verified", location: { lat: 30.27, lng: -97.74, score: 100, precision: "rooftop" } };
       }
       if (index === 1) {
         return {
           status: "corrected",
-          inputAddress,
           normalizedAddress: correctedAddress,
-          messages: [],
           location: { lat: 30.28, lng: -97.75, score: 100, precision: "postal" },
         };
       }
-      return { status: "unverified", inputAddress, messages: ["Smarty could not verify this address."] };
+      return { status: "unverified" };
     }),
 };
 
 describe("SpreadsheetValidationService", () => {
-  test("counts the corrected rows without writing to the partner's workbook", async () => {
+  test("counts verified, corrected and failed rows without writing to the partner's workbook", async () => {
     const spreadsheet = createSpreadsheet();
     const service = new SpreadsheetValidationService(spreadsheet, validator);
 
-    const { report } = await service.validate({ filePath: "/tmp/a.xlsx", mapping, fileName: "a.xlsx" });
+    const { report } = await service.validate({ filePath: "/tmp/a.xlsx", mapping });
 
     expect(spreadsheet.annotateResults).not.toHaveBeenCalled();
-    expect(report).toMatchObject({
-      fileName: "a.xlsx",
-      total: 4,
-      verified: 1,
-      corrected: 1,
-    });
+    /* Failed counts the unverified row and the row set aside while reading. */
+    expect(report).toEqual({ verified: 1, corrected: 1, failed: 2 });
   });
 
   test("returns the parsed rows so the eligibility pass need not read the file again", async () => {
     const service = new SpreadsheetValidationService(createSpreadsheet(), validator);
 
-    const { addressRows } = await service.validate({ filePath: "/tmp/a.xlsx", mapping, fileName: "a.xlsx" });
+    const { addressRows } = await service.validate({ filePath: "/tmp/a.xlsx", mapping });
 
     expect(addressRows.rows.map((row) => row.rowNumber)).toEqual([2, 3, 4]);
-    expect(addressRows.skipped).toEqual([{ rowNumber: 5, reason: "Missing street, city, state, or ZIP code." }]);
-  });
-
-  test("reports failures with row numbers in order", async () => {
-    const service = new SpreadsheetValidationService(createSpreadsheet(), validator);
-
-    const { report } = await service.validate({ filePath: "/tmp/a.xlsx", mapping, fileName: "a.xlsx" });
-
-    expect(report.failures).toEqual([
-      {
-        rowNumber: 4,
-        address: "3 Failed St, Austin, TX 78701",
-        reason: "Smarty could not verify this address.",
-      },
-      { rowNumber: 5, address: "", reason: "Missing street, city, state, or ZIP code." },
-    ]);
+    expect(addressRows.skipped).toEqual([5]);
   });
 
   test("returns what each verified or corrected row needs for the location pass", async () => {
     const service = new SpreadsheetValidationService(createSpreadsheet(), validator);
 
-    const { locations } = await service.validate({ filePath: "/tmp/a.xlsx", mapping, fileName: "a.xlsx" });
+    const { locations } = await service.validate({ filePath: "/tmp/a.xlsx", mapping });
 
     expect([...locations.keys()].sort((a, b) => a - b)).toEqual([2, 3]);
     expect(locations.get(2)?.geocode).toEqual({
       point: { lat: 30.27, lng: -97.74 },
       score: 100,
       precision: "rooftop",
-      matchedAddress: "1 Verified St, Austin, TX 78701",
     });
-    // The corrected row is keyed off Smarty's normalized address, not the input.
     expect(locations.get(3)?.geocode).toEqual({
       point: { lat: 30.28, lng: -97.75 },
       score: 100,
       precision: "postal",
-      matchedAddress: "2 CORRECTED ST, AUSTIN, TX 78701-1234",
     });
     /* So the geocoder looks up the corrected address, not what the partner typed. */
     expect(locations.get(3)?.standardizedAddress).toEqual(correctedAddress);
@@ -125,7 +101,7 @@ describe("SpreadsheetValidationService", () => {
   test("returns each row's verification status, with the standardized address only when corrected", async () => {
     const service = new SpreadsheetValidationService(createSpreadsheet(), validator);
 
-    const { verifications } = await service.validate({ filePath: "/tmp/a.xlsx", mapping, fileName: "a.xlsx" });
+    const { verifications } = await service.validate({ filePath: "/tmp/a.xlsx", mapping });
 
     expect(verifications.get(2)).toEqual({ status: "verified" });
     expect(verifications.get(3)).toEqual({
@@ -148,7 +124,6 @@ describe("SpreadsheetValidationService", () => {
     await service.validate({
       filePath: "/tmp/a.xlsx",
       mapping,
-      fileName: "a.xlsx",
       onProgress: (completed) => reported.push(completed),
     });
 

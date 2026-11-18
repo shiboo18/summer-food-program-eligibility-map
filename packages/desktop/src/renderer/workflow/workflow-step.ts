@@ -2,8 +2,6 @@ import type { ValidationReport } from "../../../../backend/dist/index.js";
 
 export interface WorkflowContext {
   readonly fileName: string | null;
-  readonly rowCount: number;
-  readonly columnCount: number;
   readonly report: ValidationReport | null;
 }
 
