@@ -3,6 +3,8 @@
 /dist
 /coverage
 /packages/*/dist
+/packages/*/build
+/packages/*/node_modules
 .env
 .env.*
 .idea

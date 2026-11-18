@@ -7,9 +7,11 @@ export const mapColumnsStep: WorkflowStep = {
   sectionId: "mapping-section",
   focusSelector: "#map-line1",
   title: () => "Map your columns",
-  description: (context) =>
-    context.fileName === null
-      ? "Upload a file to map its columns."
-      : `Match each address field to a column in ${context.fileName}.`,
+  description: (context) => `Match each address field to a column in ${context.fileName ?? "your file"}.`,
   isAvailable: (context) => context.fileName !== null,
 };
+
+/** Say which row the column names came from, and that addresses start below it. */
+export function headerRowHint(headerRowNumber: number): string {
+  return `These are the headers vibeCheck found in row ${headerRowNumber}. Addresses are read from row ${headerRowNumber + 1} down.`;
+}

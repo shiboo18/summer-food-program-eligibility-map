@@ -14,8 +14,11 @@ function row(rowNumber: number, line1 = "1 Main St"): AddressRow {
   return { rowNumber, address: address(line1) };
 }
 
-function geocode(precision: LocationPrecision, score = 100, matchedAddress = "1 MAIN ST"): GeocodeResult {
-  return { point: { lat: 1, lng: 2 }, score, precision, matchedAddress };
+/** Where each source puts its point, so a test can tell which geocode won. */
+const points = { SEED: { lat: 1, lng: 1 }, GEOCODED: { lat: 2, lng: 2 }, ANY: { lat: 3, lng: 3 } } as const;
+
+function geocode(precision: LocationPrecision, score = 100, from: keyof typeof points = "ANY"): GeocodeResult {
+  return { point: points[from], score, precision };
 }
 
 function seed(geocodeResult: GeocodeResult, standardizedAddress?: Address): ValidatedLocation {
@@ -45,7 +48,7 @@ describe("locateRows", () => {
     const { located } = await locateRows([row(1)], geocoder, { seeds });
 
     expect(geocoder.geocode).not.toHaveBeenCalled();
-    expect(located[0]?.geocode.matchedAddress).toBe("SEED");
+    expect(located[0]?.geocode.point).toEqual(points.SEED);
   });
 
   test("keeps a street-level seed, which is tight enough for a block group", async () => {
@@ -55,10 +58,10 @@ describe("locateRows", () => {
     const { located } = await locateRows([row(1)], geocoder, { seeds });
 
     expect(geocoder.geocode).not.toHaveBeenCalled();
-    expect(located[0]?.geocode.matchedAddress).toBe("SEED");
+    expect(located[0]?.geocode.point).toEqual(points.SEED);
   });
 
-  /* A ZIP centroid can sit in the wrong block group, so the geocoder gets a go. */
+  /* A ZIP centroid can sit in the wrong block group, so the geocoder is asked too. */
   test("falls back for a postal seed and takes the tighter class", async () => {
     const geocoder = geocoderReturning(geocode("rooftop", 97, "GEOCODED"));
     const seeds = seedsFor(1, seed(geocode("postal", 100, "SEED")));
@@ -66,11 +69,9 @@ describe("locateRows", () => {
     const { located } = await locateRows([row(1)], geocoder, { seeds });
 
     expect(geocoder.geocode).toHaveBeenCalledTimes(1);
-    expect(located[0]?.geocode).toMatchObject({ precision: "rooftop", matchedAddress: "GEOCODED" });
+    expect(located[0]?.geocode).toMatchObject({ precision: "rooftop", point: points.GEOCODED });
   });
 
-  /* The whole point of carrying the standardized address: a corrected address is
-     looked up in its corrected form, not as the partner typed it. */
   test("geocodes Smarty's standardized address rather than the row's raw input", async () => {
     const geocoder = geocoderReturning(geocode("rooftop", 97, "GEOCODED"));
     const corrected = address("1 MAIN STREET APT 4");
@@ -98,7 +99,7 @@ describe("locateRows", () => {
 
     const { located } = await locateRows([row(1)], geocoder, { seeds });
 
-    expect(located[0]?.geocode).toMatchObject({ precision: "rooftop", matchedAddress: "SEED" });
+    expect(located[0]?.geocode).toMatchObject({ precision: "rooftop", point: points.SEED });
   });
 
   test("breaks a tie within the same class on the match score", async () => {
@@ -107,7 +108,7 @@ describe("locateRows", () => {
 
     const { located } = await locateRows([row(1)], geocoder, { seeds });
 
-    expect(located[0]?.geocode.matchedAddress).toBe("GEOCODED");
+    expect(located[0]?.geocode.point).toEqual(points.GEOCODED);
   });
 
   test("keeps a rooftop seed whose score is below the floor only if nothing better arrives", async () => {
@@ -115,7 +116,7 @@ describe("locateRows", () => {
 
     const { located } = await locateRows([row(1)], geocoderReturning(undefined), { seeds });
 
-    expect(located[0]?.geocode.matchedAddress).toBe("SEED");
+    expect(located[0]?.geocode.point).toEqual(points.SEED);
   });
 
   test("asks the geocoder when a rooftop seed scores below the floor", async () => {
@@ -125,28 +126,17 @@ describe("locateRows", () => {
     const { located } = await locateRows([row(1)], geocoder, { seeds });
 
     expect(geocoder.geocode).toHaveBeenCalledTimes(1);
-    expect(located[0]?.geocode.matchedAddress).toBe("GEOCODED");
+    expect(located[0]?.geocode.point).toEqual(points.GEOCODED);
   });
 
-  test("honours an explicit match-score floor", async () => {
-    const geocoder = geocoderReturning(geocode("rooftop", 99));
-    const seeds = seedsFor(1, seed(geocode("rooftop", 60, "SEED")));
-
-    const { located } = await locateRows([row(1)], geocoder, { seeds, minimumMatchScore: 60 });
-
-    expect(geocoder.geocode).not.toHaveBeenCalled();
-    expect(located[0]?.geocode.matchedAddress).toBe("SEED");
-  });
-
-  test("separates out a row nothing can locate, without a reason", async () => {
+  test("separates out a row nothing can locate", async () => {
     const { located, unlocated } = await locateRows([row(3, "fake")], geocoderReturning(undefined));
 
     expect(located).toEqual([]);
-    expect(unlocated).toEqual([{ rowNumber: 3 }]);
+    expect(unlocated).toEqual([3]);
   });
 
-  /* A geocoder outage must not abandon the sheet: the row is recorded with why. */
-  test("records a geocoder failure against its row and still locates the others", async () => {
+  test("treats a geocoder failure as unlocated and still locates the others", async () => {
     const geocoder: Geocoder = {
       geocode: vi.fn(async (candidate: Address) => {
         if (candidate.line1 === "boom") {
@@ -159,7 +149,7 @@ describe("locateRows", () => {
     const { located, unlocated } = await locateRows([row(1, "boom"), row(2)], geocoder);
 
     expect(located.map((entry) => entry.rowNumber)).toEqual([2]);
-    expect(unlocated).toEqual([{ rowNumber: 1, reason: expect.stringContaining("could not be located") }]);
+    expect(unlocated).toEqual([1]);
   });
 
   test("counts progress once per row, failures included", async () => {
@@ -174,7 +164,6 @@ describe("locateRows", () => {
     const reported: number[] = [];
 
     await locateRows([row(1), row(2, "boom"), row(3)], geocoder, {
-      concurrency: 1,
       onProgress: (completed) => reported.push(completed),
     });
 

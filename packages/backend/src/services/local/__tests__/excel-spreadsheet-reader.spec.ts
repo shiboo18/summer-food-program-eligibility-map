@@ -5,18 +5,11 @@ import { join } from "node:path";
 import ExcelJS from "exceljs";
 import { afterEach, describe, expect, test } from "vitest";
 
+import type { EligibilityChecks } from "../../../types/eligibility.js";
 import type { ResultAnnotation } from "../../../types/spreadsheet.js";
 import { ExcelSpreadsheetReader } from "../excel-spreadsheet-reader.js";
 
 const directories: string[] = [];
-
-const resultColumns = {
-  standardized: "Standardized Address",
-  deliverability: "Address Checks",
-  location: "Address Match Level",
-  rural: "USDA Rural",
-  area: "USDA Eligibility",
-};
 
 afterEach(async () => {
   await Promise.all(directories.splice(0).map((directory) => rm(directory, { force: true, recursive: true })));
@@ -50,22 +43,14 @@ async function createWorkbook(): Promise<string> {
   ]);
 }
 
-/**
- * Annotates into a copy beside the original, which is the only way the app writes
- * results, and returns the copy's path.
- */
+/** Annotate into a copy beside the original, as the app does, and return the copy's path. */
 async function annotateToCopy(
   filePath: string,
   annotations: readonly ResultAnnotation[],
-  checks: { readonly includeRural: boolean; readonly includeArea: boolean },
+  checks: EligibilityChecks,
 ): Promise<string> {
   const outputPath = filePath.replace(/\.xlsx$/, "-results.xlsx");
-  await new ExcelSpreadsheetReader().annotateResults(filePath, annotations, {
-    columns: resultColumns,
-    includeRural: checks.includeRural,
-    includeArea: checks.includeArea,
-    outputPath,
-  });
+  await new ExcelSpreadsheetReader().annotateResults(filePath, annotations, { checks, outputPath });
   return outputPath;
 }
 
@@ -126,9 +111,7 @@ describe("ExcelSpreadsheetReader", () => {
         },
       },
     ]);
-    expect(result.skipped).toEqual([
-      { rowNumber: 4, reason: "Missing street, city, state, or ZIP code." },
-    ]);
+    expect(result.skipped).toEqual([4]);
   });
 
   test("reports the row the column names came from", async () => {
@@ -235,8 +218,8 @@ describe("ExcelSpreadsheetReader", () => {
     const filePath = await createWorkbookWithLegend();
 
     const copyPath = await annotateToCopy(filePath, [{ rowNumber: 3, deliverability: "Valid" }], {
-      includeRural: false,
-      includeArea: false,
+      rural: false,
+      area: false,
     });
 
     const summary = await new ExcelSpreadsheetReader().readSummary(copyPath);
@@ -294,7 +277,7 @@ describe("ExcelSpreadsheetReader", () => {
         },
         { rowNumber: 3, deliverability: "Invalid", location: "Not located", rural: "Not Verified", area: "Not Verified" },
       ],
-      { includeRural: true, includeArea: true },
+      { rural: true, area: true },
     );
 
     const workbook = new ExcelJS.Workbook();
@@ -314,10 +297,9 @@ describe("ExcelSpreadsheetReader", () => {
     // Standardized address written only for the corrected row, in the column before the status.
     expect(sheet.getRow(2).getCell(6).value).toBe("123 Main St, Austin, TX 78701-1234");
     expect(sheet.getRow(3).getCell(6).value ?? "").toBe("");
-    // Corrected addresses are color-coded, and the column is widened so it reads without resizing.
+    // Corrected addresses are color-coded, and the column is widened.
     expect((sheet.getRow(2).getCell(6).fill as ExcelJS.FillPattern).fgColor?.argb).toBe("FFFCE9C8");
     expect(sheet.getColumn(6).width).toBe(36);
-    // Status cell written and color-coded.
     const statusCell = sheet.getRow(2).getCell(7);
     expect(statusCell.value).toBe("Valid and corrected");
     expect((statusCell.fill as ExcelJS.FillPattern).fgColor?.argb).toBe("FFDDF3DD");
@@ -342,8 +324,8 @@ describe("ExcelSpreadsheetReader", () => {
     const filePath = await createWorkbook();
 
     const copyPath = await annotateToCopy(filePath, [{ rowNumber: 2, deliverability: "Valid" }], {
-      includeRural: false,
-      includeArea: false,
+      rural: false,
+      area: false,
     });
 
     const summary = await new ExcelSpreadsheetReader().readSummary(copyPath);
@@ -364,8 +346,8 @@ describe("ExcelSpreadsheetReader", () => {
     const reader = new ExcelSpreadsheetReader();
 
     const copyPath = await annotateToCopy(filePath, [{ rowNumber: 2, deliverability: "Valid" }], {
-      includeRural: false,
-      includeArea: false,
+      rural: false,
+      area: false,
     });
 
     const original = await reader.readSummary(filePath);

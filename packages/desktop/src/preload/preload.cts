@@ -1,9 +1,10 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-/* Type-only imports are erased at compile time, so the contracts stay in one
-   place without giving this CommonJS preload a runtime dependency. */
+/* Type-only imports are erased at compile time, so this CommonJS preload shares
+   the contracts without a runtime dependency. */
 import type {
   ColumnMapping,
+  CredentialCheck,
   CredentialInput,
   CredentialStatus,
   EligibilityChecks,
@@ -12,28 +13,17 @@ import type {
   RunProgress,
   ValidationReport,
 } from "../../../backend/dist/index.js";
-
-/** Main-process projections that exist only for this bridge. */
-interface SpreadsheetSelection {
-  readonly fileName: string;
-  readonly headers: readonly string[];
-  readonly headerRowNumber: number;
-  readonly rowCount: number;
-}
-
-interface ExportResult {
-  readonly canceled: boolean;
-  readonly filePath?: string;
-  readonly rowsAnnotated?: number;
-}
+import type { CredentialSaveResult, ExportResult, SpreadsheetSelection } from "../renderer/runtime-api.js";
 
 const runtimeInfo = Object.freeze({
-  electron: process.versions.electron ?? "unknown",
-  chromium: process.versions.chrome ?? "unknown",
+  electron: process.versions.electron,
+  chromium: process.versions.chrome,
   node: process.versions.node,
   platform: process.platform,
 });
 
+/* `satisfies` checks this object against the renderer's declaration of the
+   bridge, so a method added on one side and not the other fails the build. */
 contextBridge.exposeInMainWorld(
   "shareOurStrengths",
   Object.freeze({
@@ -51,7 +41,7 @@ contextBridge.exposeInMainWorld(
     results: Object.freeze({
       export: (fileName: string) =>
         ipcRenderer.invoke("results:export", { fileName }) as Promise<ExportResult>,
-      reveal: (fileName: string) => ipcRenderer.invoke("results:reveal", fileName) as Promise<void>,
+      open: (fileName: string) => ipcRenderer.invoke("results:open", fileName) as Promise<void>,
     }),
     run: Object.freeze({
       onProgress: (listener: (progress: RunProgress) => void) => {
@@ -63,14 +53,14 @@ contextBridge.exposeInMainWorld(
     settings: Object.freeze({
       getStatus: () => ipcRenderer.invoke("settings:get-status") as Promise<CredentialStatus>,
       save: (input: CredentialInput) =>
-        ipcRenderer.invoke("settings:save", input) as Promise<CredentialStatus>,
+        ipcRenderer.invoke("settings:save", input) as Promise<CredentialSaveResult>,
       clear: () => ipcRenderer.invoke("settings:clear") as Promise<CredentialStatus>,
+      verify: () => ipcRenderer.invoke("settings:verify") as Promise<CredentialCheck>,
     }),
     preferences: Object.freeze({
       get: () => ipcRenderer.invoke("preferences:get") as Promise<Preferences>,
       update: (patch: Partial<Preferences>) =>
         ipcRenderer.invoke("preferences:update", patch) as Promise<Preferences>,
-      remove: (key: string) => ipcRenderer.invoke("preferences:remove", key) as Promise<Preferences>,
       getSystemTheme: () => ipcRenderer.invoke("preferences:system-theme") as Promise<"light" | "dark">,
       onSystemThemeChange: (listener: (theme: "light" | "dark") => void) => {
         const handler = (_event: unknown, theme: "light" | "dark"): void => listener(theme);
@@ -78,5 +68,5 @@ contextBridge.exposeInMainWorld(
         return () => ipcRenderer.removeListener("preferences:system-theme-changed", handler);
       },
     }),
-  }),
+  }) satisfies Window["shareOurStrengths"],
 );

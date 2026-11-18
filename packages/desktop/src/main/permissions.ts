@@ -12,10 +12,9 @@ export interface PermissionSession {
 }
 
 /**
- * Refuses every web permission for the session. The app reads a workbook the
- * partner picks through a native dialog, so nothing in the renderer needs the
- * camera, microphone, location, notifications, or the clipboard; a page that
- * somehow loaded there must not be able to ask for them either.
+ * Refuse every web permission for the session. Nothing in the renderer needs the
+ * camera, microphone, location, notifications, or the clipboard, and a page that
+ * somehow loaded there must not be able to ask for them.
  */
 export function denyAllPermissions(session: PermissionSession): void {
   session.setPermissionRequestHandler((_contents, _permission, callback): void => {

@@ -1,13 +1,11 @@
 /**
- * The Smarty SDK's published builds import a tslib copy they vendor under
+ * The Smarty SDK's builds import a tslib copy vendored under
  * dist/<format>/node_modules by relative path. electron-builder prunes nested
- * node_modules when it collects dependencies, so that path does not exist in the
- * packaged app and the main process fails to start with ERR_MODULE_NOT_FOUND.
+ * node_modules, so the packaged main process fails with ERR_MODULE_NOT_FOUND.
  *
  * This rewrites the specifier to the bare package name and removes the vendored
- * directory, so both the packaged app and a local run resolve the hoisted tslib.
- * Removing the directory matters: Node stops at the nearest node_modules, and the
- * vendored one has no package.json, so a bare import would fail while it exists.
+ * directory so the hoisted tslib resolves. The removal matters: Node stops at the
+ * nearest node_modules, and the vendored one has no package.json.
  *
  * Safe to run repeatedly. Run before packaging.
  */

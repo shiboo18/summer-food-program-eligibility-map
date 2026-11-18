@@ -2,6 +2,7 @@ import SmartySDK from "smartystreets-javascript-sdk";
 
 import type { AddressValidator } from "../../contracts.js";
 import type { Address, AddressVerificationResult } from "../../types/address.js";
+import type { SmartyCredentialsProvider } from "../../types/credentials.js";
 import type { LocationPrecision } from "../../types/eligibility.js";
 import type { ProgressReporter } from "../../types/progress.js";
 
@@ -15,12 +16,7 @@ interface SmartyClient {
   send(batch: SmartyBatch): Promise<void>;
 }
 
-interface SmartyCredentials {
-  readonly authId: string | undefined;
-  readonly authToken: string | undefined;
-}
-
-type SmartyCredentialProvider = () => Promise<SmartyCredentials>;
+/** The stored key, or `undefined` when no whole key is stored. */
 export type SmartyClientFactory = (authId: string, authToken: string) => SmartyClient;
 
 const createSmartyClient: SmartyClientFactory = (authId, authToken) => {
@@ -36,7 +32,7 @@ const createSmartyClient: SmartyClientFactory = (authId, authToken) => {
 /** Validates US addresses with Smarty while keeping secret credentials in the Electron main process. */
 export class SmartyAddressValidator implements AddressValidator {
   public constructor(
-    private readonly getCredentials: SmartyCredentialProvider,
+    private readonly getCredentials: SmartyCredentialsProvider,
     private readonly createClient: SmartyClientFactory = createSmartyClient,
   ) {}
 
@@ -48,8 +44,11 @@ export class SmartyAddressValidator implements AddressValidator {
       return [];
     }
 
-    const { authId, authToken } = await this.getAndResolveCredentials();
-    const client = this.createClient(authId, authToken);
+    const credentials = await this.getCredentials();
+    if (credentials === undefined) {
+      throw new Error("Add your Smarty secret key in Settings before running checks.");
+    }
+    const client = this.createClient(credentials.authId, credentials.authToken);
     const results: AddressVerificationResult[] = [];
     for (let start = 0; start < addresses.length; start += maximumBatchSize) {
       const chunk = addresses.slice(start, start + maximumBatchSize);
@@ -59,17 +58,6 @@ export class SmartyAddressValidator implements AddressValidator {
       onProgress?.(results.length);
     }
     return results;
-  }
-
-  /** The stored credentials, trimmed and confirmed usable before any request is built. */
-  private async getAndResolveCredentials(): Promise<{ readonly authId: string; readonly authToken: string }> {
-    const stored = await this.getCredentials();
-    const authId = stored.authId?.trim() ?? "";
-    const authToken = stored.authToken?.trim() ?? "";
-    if (!authId || !authToken) {
-      throw new Error("Configure Smarty AUTH_ID and AUTH_TOKEN in Settings before verifying.");
-    }
-    return { authId, authToken };
   }
 
   private async validateChunk(
@@ -96,31 +84,17 @@ export class SmartyAddressValidator implements AddressValidator {
   }
 }
 
-function toResult(address: Address, lookup: SmartyLookup | undefined): AddressVerificationResult {
-  const candidate = lookup?.result[0];
-  if (candidate === undefined) {
-    return {
-      status: "unverified",
-      inputAddress: address,
-      messages: ["Smarty could not verify this address."],
-    };
-  }
-
-  const normalizedAddress = candidateToAddress(candidate);
-  if (normalizedAddress === undefined) {
-    return {
-      status: "unverified",
-      inputAddress: address,
-      messages: ["Smarty returned an incomplete address result."],
-    };
+/** Read one lookup's first candidate; no candidate, or one missing a part, is unverified. */
+function toResult(address: Address, lookup: SmartyLookup): AddressVerificationResult {
+  const candidate = lookup.result[0];
+  const normalizedAddress = candidate === undefined ? undefined : candidateToAddress(candidate);
+  if (candidate === undefined || normalizedAddress === undefined) {
+    return { status: "unverified" };
   }
 
   const location = candidateToLocation(candidate);
-  const base = location !== undefined ? { location } : {};
-  if (!addressesMatch(address, normalizedAddress)) {
-    return { status: "corrected", inputAddress: address, normalizedAddress, messages: [], ...base };
-  }
-  return { status: "verified", inputAddress: address, normalizedAddress, messages: [], ...base };
+  const status = addressesMatch(address, normalizedAddress) ? "verified" : "corrected";
+  return { status, normalizedAddress, ...(location === undefined ? {} : { location }) };
 }
 
 function candidateToLocation(
@@ -130,9 +104,8 @@ function candidateToLocation(
   if (latitude === undefined || longitude === undefined) {
     return undefined;
   }
-  /* A Smarty candidate IS the USPS address, so the match itself is not in doubt
-     and the score is full. What varies is how tightly the point is placed, which
-     the precision class carries. */
+  /* A Smarty candidate is the USPS address, so the match is certain and the score
+     is full; the precision class carries how tightly the point is placed. */
   return { lat: latitude, lng: longitude, score: 100, precision: toPrecision(precision) };
 }
 

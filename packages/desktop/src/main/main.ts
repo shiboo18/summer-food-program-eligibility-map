@@ -4,33 +4,42 @@ import {
   EsriGeocoder,
   ExcelSpreadsheetReader,
   KyHttpClient,
-  PreferencesService,
   PreferencesStore,
-  RESULT_COLUMNS,
   SettingsStore,
   SmartyAddressValidator,
+  SmartyCredentialVerifier,
   SpreadsheetValidationService,
   USDA_RURAL_SERVICE_URL,
   UsdaRuralZoneMapChecker,
   UsdaSummerMealBenefitChecker,
   buildEligibilityReport,
+  checkStoredCredentials,
   createPassReporters,
+  isDeliverable,
   locateRows,
   parseColumnMapping,
+  parseCredentialInput,
+  saveAcceptedCredentials,
+  toSmartyCredentials,
   toResultAnnotation,
+  type AddressRow,
   type AddressRowsResult,
   type AreaEligibilityResult,
-  type CheckOutcome,
-  type ColumnMapping,
   type EligibilityChecks,
-  type ValidatedLocation,
+  type Geocoder,
   type ProgressReporter,
   type ResultAnnotation,
   type RowVerification,
   type RunPhase,
   type RunProgress,
   type RuralResult,
+  type RuralZoneChecker,
+  type SmartyCredentialsProvider,
+  type SpreadsheetReader,
   type SpreadsheetSummary,
+  type SpreadsheetWriter,
+  type SummerMealBenefitChecker,
+  type ValidatedLocation,
 } from "../../../backend/dist/index.js";
 import {
   app,
@@ -65,24 +74,14 @@ function createSettingsStore(): SettingsStore {
   });
 }
 
-function createPreferencesService(): PreferencesService {
-  return new PreferencesService(new PreferencesStore(join(app.getPath("userData"), "preferences.v1.json")));
+function createPreferencesStore(): PreferencesStore {
+  return new PreferencesStore(join(app.getPath("userData"), "preferences.v1.json"));
 }
 
-type SmartyCredentialsProvider = () => Promise<{ authId: string | undefined; authToken: string | undefined }>;
+/** The stored key, or `undefined` when no whole key is stored. */
 
 function createSmartyCredentialsProvider(settings: SettingsStore): SmartyCredentialsProvider {
-  return async () => {
-    const credentials = await settings.getCredentials();
-    return {
-      authId: credentials.smartyAuthId,
-      authToken: credentials.smartyAuthToken,
-    };
-  };
-}
-
-function createSmartyAddressValidator(settings: SettingsStore): SmartyAddressValidator {
-  return new SmartyAddressValidator(createSmartyCredentialsProvider(settings));
+  return async () => toSmartyCredentials(await settings.getCredentials());
 }
 
 /**
@@ -91,9 +90,9 @@ function createSmartyAddressValidator(settings: SettingsStore): SmartyAddressVal
  * delay geocoding.
  */
 interface EligibilityServices {
-  readonly geocoder: EsriGeocoder;
-  readonly zone: UsdaRuralZoneMapChecker;
-  readonly benefit: UsdaSummerMealBenefitChecker;
+  readonly geocoder: Geocoder;
+  readonly zone: RuralZoneChecker;
+  readonly benefit: SummerMealBenefitChecker;
 }
 
 function createEligibilityServices(): EligibilityServices {
@@ -114,16 +113,11 @@ function toEligibilityChecks(input: unknown): EligibilityChecks {
 }
 
 /** A stable key for a mapping, so cached rows are reused only under the same columns. */
-function columnMappingKey(mapping: ColumnMapping): string {
-  return [mapping.line1, mapping.line2 ?? "", mapping.city, mapping.state, mapping.postalCode].join("\u0000");
-}
-
 /**
- * A reporter that forwards a phase's progress to the frame that asked for the run,
- * so the screen can fill its bar as the work goes rather than only when it lands.
+ * Return a reporter that forwards a phase's progress to the frame that asked for
+ * the run, so the screen's bar fills as the work goes.
  *
- * @param total Every data row the sheet holds, which is what both phases work
- *   through, so one bar spans the whole run.
+ * @param total The rows the phase works through.
  */
 function reportProgressTo(event: IpcMainInvokeEvent, phase: RunPhase, total: number): ProgressReporter {
   return (completed: number): void => {
@@ -143,8 +137,8 @@ function assertTrustedSender(event: IpcMainInvokeEvent): void {
 }
 
 /**
- * Resolves an untrusted file name to a workbook this process opened through the
- * native dialog, so a file path can never come from the renderer.
+ * Resolve an untrusted file name to a workbook this process opened through the
+ * native dialog, so a file path never comes from the renderer.
  */
 function requireOpenedSpreadsheet(
   opened: Map<string, SpreadsheetSummary>,
@@ -160,23 +154,32 @@ function requireOpenedSpreadsheet(
   return summary;
 }
 
-function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesService): void {
-  const reader = new ExcelSpreadsheetReader();
-  const validation = new SpreadsheetValidationService(reader, createSmartyAddressValidator(settings));
+function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesStore): void {
+  const reader: SpreadsheetReader & SpreadsheetWriter = new ExcelSpreadsheetReader();
+  const storedCredentials = createSmartyCredentialsProvider(settings);
+  const validation = new SpreadsheetValidationService(reader, new SmartyAddressValidator(storedCredentials));
+  const credentialVerifier = new SmartyCredentialVerifier();
   const eligibility = createEligibilityServices();
   /** Summaries are kept in the main process so the renderer never supplies a file path. */
   const openedSpreadsheets = new Map<string, SpreadsheetSummary>();
-  /** Smarty coordinates from the most recent validation, reused by eligibility so Smarty is called once. */
-  const smartyLocations = new Map<string, ReadonlyMap<number, ValidatedLocation>>();
-  /** Per-row Smarty verification (status + standardized address), reused by eligibility for the annotation. */
-  const rowVerifications = new Map<string, ReadonlyMap<number, RowVerification>>();
+  /**
+   * Each file's most recent validation, reused by eligibility so a run reads the
+   * workbook and asks Smarty once. Its rows are reused only for the same mapping,
+   * so remapped columns are read afresh.
+   */
+  const validations = new Map<
+    string,
+    {
+      readonly mappingKey: string;
+      readonly rows: AddressRowsResult;
+      readonly locations: ReadonlyMap<number, ValidatedLocation>;
+      readonly verifications: ReadonlyMap<number, RowVerification>;
+    }
+  >();
   /** The most recent per-row result annotations, written to a copy only when the user downloads. */
   const lastAnnotations = new Map<string, { annotations: readonly ResultAnnotation[]; checks: EligibilityChecks }>();
   /** Where each file's results were last exported, so the renderer can reveal it by name, never by path. */
   const exportedPaths = new Map<string, string>();
-  /** Rows parsed during validation, reused by the eligibility pass so a run reads the
-      workbook once. The mapping key guards a re-run under remapped columns from reusing rows read under the old mapping. */
-  const parsedRows = new Map<string, { readonly mappingKey: string; readonly rows: AddressRowsResult }>();
 
   ipcMain.handle("spreadsheet:open", async (event): Promise<unknown> => {
     assertTrustedSender(event);
@@ -220,12 +223,9 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
     const { report, locations, verifications, addressRows } = await validation.validate({
       filePath: summary.filePath,
       mapping: columnMapping,
-      fileName: summary.fileName,
       onProgress: reportProgressTo(event, "verifying", summary.rowCount),
     });
-    smartyLocations.set(summary.fileName, locations);
-    rowVerifications.set(summary.fileName, verifications);
-    parsedRows.set(summary.fileName, { mappingKey: columnMappingKey(columnMapping), rows: addressRows });
+    validations.set(summary.fileName, { mappingKey: JSON.stringify(columnMapping), rows: addressRows, locations, verifications });
     return report;
   });
 
@@ -240,32 +240,26 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
 
     const columnMapping = parseColumnMapping(mapping, summary.headers);
     const selectedChecks = toEligibilityChecks(checks);
-    /* Reuse the rows validation already parsed when the mapping is unchanged, so a
-       run reads the workbook once; re-read if the columns were remapped since. */
-    const cachedRows = parsedRows.get(summary.fileName);
+    const validated = validations.get(summary.fileName);
     const { rows, skipped } =
-      cachedRows?.mappingKey === columnMappingKey(columnMapping)
-        ? cachedRows.rows
+      validated?.mappingKey === JSON.stringify(columnMapping)
+        ? validated.rows
         : await reader.readAddressRows(summary.filePath, columnMapping);
 
-    /* An address Smarty could not verify is not put through the USDA checks — a
-       result would have no verified location to stand on — so it is set aside up
-       front and reported as needing verification rather than checked. */
-    const verifications = rowVerifications.get(summary.fileName) ?? new Map<number, RowVerification>();
-    const isDeliverable = (rowNumber: number): boolean => {
-      const status = verifications.get(rowNumber)?.status;
-      return status === "verified" || status === "corrected";
-    };
-    const verifiedRows = rows.filter((row) => isDeliverable(row.rowNumber));
-    const unverified = rows.filter((row) => !isDeliverable(row.rowNumber)).map((row) => row.rowNumber);
+    /* Rows Smarty could not verify have no verified location, so they skip the USDA
+       checks and are reported as needing verification. */
+    const verifications = validated?.verifications ?? new Map<number, RowVerification>();
+    const deliverable = (row: AddressRow): boolean => isDeliverable(verifications.get(row.rowNumber)?.status ?? "unverified");
+    const verifiedRows = rows.filter(deliverable);
+    const unverified = rows.filter((row) => !deliverable(row)).map((row) => row.rowNumber);
 
     /* Each USDA pass reports under its own phase so the run screen can name the
-       step now running. Locating shares a phase's slice with the check behind it,
-       so the bar fills end to end rather than one slice per pass.
+       running step. Locating shares a slice with the check after it, so the bar
+       fills end to end.
 
        When both checks run they go out concurrently: they hit different hosts, so
-       neither sees more than USDA_CHECK_CONCURRENCY at once, and their combined
-       progress walks the second slice forward as either pass finishes a row. */
+       neither exceeds USDA_CHECK_CONCURRENCY, and their combined progress drives
+       the second slice. */
     const runConcurrently = selectedChecks.rural && selectedChecks.area;
     let locating: ProgressReporter | undefined;
     let ruralCheck: ProgressReporter | undefined;
@@ -290,36 +284,26 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
     }
 
     const { located, unlocated } = await locateRows(verifiedRows, eligibility.geocoder, {
-      seeds: smartyLocations.get(summary.fileName),
+      seeds: validated?.locations,
       onProgress: locating,
     });
     const [zone, benefit] = await Promise.all([
       selectedChecks.rural
         ? eligibility.zone.checkZoneBatch(located, ruralCheck)
-        : Promise.resolve(new Map<number, CheckOutcome<RuralResult>>()),
+        : new Map<number, RuralResult | undefined>(),
       selectedChecks.area
         ? eligibility.benefit.checkBenefitBatch(located, areaCheck)
-        : Promise.resolve(new Map<number, CheckOutcome<AreaEligibilityResult>>()),
+        : new Map<number, AreaEligibilityResult | undefined>(),
     ]);
 
     const report = buildEligibilityReport({
-      fileName: summary.fileName,
       located,
-      unlocated,
-      unverified,
+      unchecked: [...unlocated, ...unverified, ...skipped],
       zone,
       benefit,
-      skipped,
-      checks: selectedChecks,
     });
-    const eligibilityByRow = new Map(report.rows.map((row) => [row.rowNumber, row]));
     const annotations = report.rows.map((row) =>
-      toResultAnnotation(
-        row.rowNumber,
-        verifications.get(row.rowNumber) ?? { status: "unverified" },
-        selectedChecks,
-        eligibilityByRow.get(row.rowNumber),
-      ),
+      toResultAnnotation(row.rowNumber, verifications.get(row.rowNumber) ?? { status: "unverified" }, selectedChecks, row),
     );
     // Cache annotations so the user can download them on demand; never write in place.
     lastAnnotations.set(summary.fileName, { annotations, checks: selectedChecks });
@@ -349,25 +333,27 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
     }
 
     await reader.annotateResults(summary.filePath, cached.annotations, {
-      columns: RESULT_COLUMNS,
-      includeRural: cached.checks.rural,
-      includeArea: cached.checks.area,
+      checks: cached.checks,
       outputPath: selection.filePath,
     });
     exportedPaths.set(summary.fileName, selection.filePath);
-    return { canceled: false, filePath: selection.filePath, rowsAnnotated: cached.annotations.length };
+    return { canceled: false, filePath: selection.filePath };
   });
 
-  /* Reveals the exported copy in the OS file manager. The path is looked up here by
-     file name, so it never has to travel through the renderer. */
-  ipcMain.handle("results:reveal", (event, fileName: unknown): void => {
+  /* The exported path is looked up by file name, so it never travels through the
+     renderer. */
+  ipcMain.handle("results:open", async (event, fileName: unknown): Promise<void> => {
     assertTrustedSender(event);
     const summary = requireOpenedSpreadsheet(openedSpreadsheets, fileName);
     const exportedPath = exportedPaths.get(summary.fileName);
     if (exportedPath === undefined) {
       throw new Error("Export the results before opening them.");
     }
+    /* The folder first, so the file can still be found if opening it fails. */
     shell.showItemInFolder(exportedPath);
+    if ((await shell.openPath(exportedPath)) !== "") {
+      throw new Error("The results file is saved but could not be opened. It is shown in its folder.");
+    }
   });
 
   ipcMain.handle("settings:get-status", async (event): Promise<unknown> => {
@@ -376,23 +362,27 @@ function registerIpcHandlers(settings: SettingsStore, preferences: PreferencesSe
   });
   ipcMain.handle("settings:save", async (event, input: unknown): Promise<unknown> => {
     assertTrustedSender(event);
-    return settings.save(input);
+    const outcome = await saveAcceptedCredentials(toSmartyCredentials(parseCredentialInput(input)), {
+      store: async (credentials) => settings.save(credentials),
+      verifier: credentialVerifier,
+    });
+    return { ...outcome, status: await settings.getStatus() };
   });
   ipcMain.handle("settings:clear", async (event): Promise<unknown> => {
     assertTrustedSender(event);
     return settings.clear();
   });
+  ipcMain.handle("settings:verify", async (event): Promise<unknown> => {
+    assertTrustedSender(event);
+    return checkStoredCredentials(storedCredentials, credentialVerifier);
+  });
   ipcMain.handle("preferences:get", async (event): Promise<unknown> => {
     assertTrustedSender(event);
-    return preferences.readAll();
+    return preferences.get();
   });
   ipcMain.handle("preferences:update", async (event, patch: unknown): Promise<unknown> => {
     assertTrustedSender(event);
-    return preferences.write(patch);
-  });
-  ipcMain.handle("preferences:remove", async (event, key: unknown): Promise<unknown> => {
-    assertTrustedSender(event);
-    return preferences.remove(key);
+    return preferences.update(patch);
   });
   ipcMain.handle("preferences:system-theme", async (event): Promise<unknown> => {
     assertTrustedSender(event);
@@ -479,7 +469,7 @@ void app
       app.dock.setIcon(iconPath);
     }
     const settings = createSettingsStore();
-    const preferences = createPreferencesService();
+    const preferences = createPreferencesStore();
     registerIpcHandlers(settings, preferences);
     await createWindow();
     app.on("activate", (): void => {

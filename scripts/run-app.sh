@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-# Set up and launch vibeCheck for local development.
-# Installs workspace dependencies, compiles both packages, and starts the app.
-# Safe to run repeatedly.
+# Set up and launch vibeCheck for local development. Safe to run repeatedly.
 set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

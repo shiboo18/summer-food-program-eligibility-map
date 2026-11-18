@@ -1,4 +1,5 @@
 import type { Address } from "./address.js";
+import type { EligibilityChecks } from "./eligibility.js";
 
 export interface SpreadsheetSummary {
   readonly filePath: string;
@@ -28,14 +29,10 @@ export interface AddressRow {
   readonly address: Address;
 }
 
-export interface SkippedRow {
-  readonly rowNumber: number;
-  readonly reason: string;
-}
-
 export interface AddressRowsResult {
   readonly rows: readonly AddressRow[];
-  readonly skipped: readonly SkippedRow[];
+  /** Row numbers set aside because their mapped cells do not read as an address. */
+  readonly skipped: readonly number[];
 }
 
 /** Sponsor-readable deliverability verdict written into the results column. */
@@ -56,8 +53,7 @@ export type RuralLabel =
 /**
  * Sponsor-readable USDA area-eligibility verdict; "Not Verified" when the row
  * was undeliverable or its check produced no result. The "(approximate
- * location)" variants hedge the verdict when the location was too coarse to
- * trust which block group it fell in.
+ * location)" variants are as for [RuralLabel].
  */
 export type AreaLabel =
   | "In Area — Eligible"
@@ -69,10 +65,9 @@ export type AreaLabel =
   | "Not Eligible (approximate location)";
 
 /**
- * Sponsor-readable location precision in plain language, worst to best: how
- * tightly the row was placed, which decides whether its block group can be
- * trusted. "Exact address" and "Street level" are trusted; "ZIP area" and "Town
- * area" are only approximate; "Not located" means no coordinate was resolved.
+ * Sponsor-readable location precision. "Exact address" and "Street level" are
+ * trusted; "ZIP area" and "Town area" are approximate; "Not located" means no
+ * coordinate was resolved.
  */
 export type LocationLabel = "Exact address" | "Street level" | "ZIP area" | "Town area" | "Not located";
 
@@ -86,28 +81,15 @@ export interface ResultAnnotation {
   readonly deliverability: DeliverabilityLabel;
   /** The standardized address, present only when the input was corrected. */
   readonly standardizedAddress?: string;
-  /** How precisely the row was located. */
   readonly location?: LocationLabel;
   readonly rural?: RuralLabel;
   readonly area?: AreaLabel;
 }
 
-/** Header names for the appended result columns (kept in config, passed through). */
-export interface ResultColumns {
-  readonly standardized: string;
-  readonly deliverability: string;
-  readonly location: string;
-  readonly rural: string;
-  readonly area: string;
-}
-
 /** Which result columns to write, and where to write them. */
 export interface ResultColumnOptions {
-  /** Which result columns to add and their header names. */
-  readonly columns: ResultColumns;
-  /** Whether the rural / area columns should be written (checks that ran). */
-  readonly includeRural: boolean;
-  readonly includeArea: boolean;
+  /** The checks that ran; the rural and area columns are written only for these. */
+  readonly checks: EligibilityChecks;
   /** Where to write the annotated copy. The partner's original is never written to. */
   readonly outputPath: string;
 }

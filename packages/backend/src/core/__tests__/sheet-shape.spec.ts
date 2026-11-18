@@ -76,7 +76,6 @@ describe("findHeaderRow", () => {
   });
 
   test("ignores a column filled down past the names when measuring how full a row is", () => {
-    /* Mirrors the stray fill-down that makes every row of a sheet look occupied. */
     const rows = [
       ["", "", "", "REQUESTED STREET ADDRESS"],
       ["Street", "City", "State", "REQUESTED STREET ADDRESS"],

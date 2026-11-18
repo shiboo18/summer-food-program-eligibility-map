@@ -1,26 +1,21 @@
 import type { HttpGetClient, RuralZoneChecker } from "../../contracts.js";
-import type { CheckOutcome, GeoPoint, LocatedRow, RuralResult } from "../../types/eligibility.js";
+import type { GeoPoint, LocatedRow, RuralResult } from "../../types/eligibility.js";
 import type { ProgressReporter } from "../../types/progress.js";
-import { USDA_CHECK_CONCURRENCY, USDA_RURAL_CRITERIA, USDA_RURAL_LAYER_IDS } from "../../config/constants.js";
-import { mapWithConcurrency } from "../../core/run/concurrency.js";
-import { coordinateKey } from "../../core/run/geocode-quality.js";
+import { USDA_RURAL_LAYER_IDS } from "../../config/constants.js";
+import { checkByCoordinate } from "../../core/run/concurrency.js";
 
 /**
- * Comma-free `layerDefs` selecting every rural-criteria layer with no attribute
- * filter, so one service-level query returns a per-layer intersect count. Built
- * once from the configured layer ids.
+ * `layerDefs` selecting every rural-criteria layer with no attribute filter, so
+ * one service-level query returns a per-layer intersect count.
  */
 const ruralLayerDefs = JSON.stringify(Object.fromEntries(USDA_RURAL_LAYER_IDS.map((id) => [id, ""])));
 
 /**
- * Determines USDA rural designation by intersecting each point against the five
- * rural-criteria layers. A point in ANY layer is rural; the matched layers are
- * reported as human-readable criteria.
+ * Determines USDA rural designation by intersecting each point with the
+ * rural-criteria layers. A point in any layer is rural.
  *
- * The five layers are asked for in one service-level `layerDefs` query rather
- * than one request per layer, so each point costs a single request. The batch is
- * still paced a few points at a time to keep a large sheet from flooding a free
- * public service.
+ * All layers are asked for in one `layerDefs` query per point, and points are
+ * paced a few at a time so a large sheet does not flood a free public service.
  */
 export class UsdaRuralZoneMapChecker implements RuralZoneChecker {
   public constructor(private readonly http: HttpGetClient) {}
@@ -28,27 +23,8 @@ export class UsdaRuralZoneMapChecker implements RuralZoneChecker {
   public async checkZoneBatch(
     rows: readonly LocatedRow[],
     onProgress?: ProgressReporter,
-  ): Promise<ReadonlyMap<number, CheckOutcome<RuralResult>>> {
-    /* Rows at the same coordinate share one in-flight lookup, so a duplicate
-       never issues its own request and takes the first row's outcome — including
-       a failure, which is therefore reported alike rather than retried. Scoped to
-       this call, so there is no state to invalidate between runs. */
-    const byCoordinate = new Map<string, Promise<RuralResult>>();
-    const outcomes = await mapWithConcurrency(
-      rows,
-      USDA_CHECK_CONCURRENCY,
-      async (row) => {
-        const key = coordinateKey(row.geocode.point);
-        let pending = byCoordinate.get(key);
-        if (pending === undefined) {
-          pending = this.ruralDesignationAt(row.geocode.point);
-          byCoordinate.set(key, pending);
-        }
-        return pending;
-      },
-      onProgress,
-    );
-    return new Map(rows.map((row, index) => [row.rowNumber, outcomes[index] as CheckOutcome<RuralResult>]));
+  ): Promise<ReadonlyMap<number, RuralResult | undefined>> {
+    return checkByCoordinate(rows, (point) => this.ruralDesignationAt(point), onProgress);
   }
 
   private async ruralDesignationAt(point: GeoPoint): Promise<RuralResult> {
@@ -70,15 +46,7 @@ export class UsdaRuralZoneMapChecker implements RuralZoneChecker {
     }
 
     const counts = layerCounts(payload);
-    /* Ordered by the configured layer ids, not the response order, so the matched
-       criteria a partner reads are stable however the service returns them. */
-    const matchedCriteria = USDA_RURAL_LAYER_IDS.filter((id) => (counts.get(id) ?? 0) > 0).map(
-      (id) => USDA_RURAL_CRITERIA[id] ?? `Rural criteria layer ${id}`,
-    );
-    return {
-      designation: matchedCriteria.length > 0 ? "rural" : "not-rural",
-      matchedCriteria,
-    };
+    return { designation: USDA_RURAL_LAYER_IDS.some((id) => (counts.get(id) ?? 0) > 0) ? "rural" : "not-rural" };
   }
 }
 
@@ -86,9 +54,8 @@ export class UsdaRuralZoneMapChecker implements RuralZoneChecker {
  * Per-layer intersect counts from a `layerDefs` query, keyed by layer id.
  *
  * ArcGIS reports failures as HTTP 200 with an `error` field, which the transport
- * retry layer never sees, so it is caught here. A response without the `layers`
- * array is treated as an error rather than "not rural": a malformed answer must
- * not quietly read as a negative result.
+ * never sees, so it is caught here. A response without `layers` is an error, not
+ * "not rural": a malformed answer must not read as a negative result.
  */
 function layerCounts(payload: unknown): ReadonlyMap<number, number> {
   if (typeof payload !== "object" || payload === null) {

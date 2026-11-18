@@ -2,8 +2,6 @@ import type { ValidationReport } from "../../../../backend/dist/index.js";
 
 export interface WorkflowContext {
   readonly fileName: string | null;
-  readonly rowCount: number;
-  readonly columnCount: number;
   readonly report: ValidationReport | null;
 }
 
@@ -19,6 +17,6 @@ export interface WorkflowStep {
   readonly focusSelector: string;
   title(context: WorkflowContext): string;
   description(context: WorkflowContext): string;
-  /** A step stays grayed out until its own prerequisites are met. */
+  /** Return whether the step's prerequisites are met; until then it is grayed out. */
   isAvailable(context: WorkflowContext): boolean;
 }

@@ -3,8 +3,9 @@ import { basename } from "node:path";
 
 import ExcelJS from "exceljs";
 
-import { HEADER_ROW_SCAN_LIMIT } from "../../config/constants.js";
+import { HEADER_ROW_SCAN_LIMIT, RESULT_COLUMNS } from "../../config/constants.js";
 import { parseAddress } from "../../core/address-shape.js";
+import { resultColumnsFor } from "../../core/eligibility-checks.js";
 import { findHeaderRow, isDataRow, type HeaderRow } from "../../core/sheet-shape.js";
 import type { SpreadsheetReader, SpreadsheetWriter } from "../../contracts.js";
 import type {
@@ -13,7 +14,6 @@ import type {
   ColumnMapping,
   ResultAnnotation,
   ResultColumnOptions,
-  SkippedRow,
   SpreadsheetSummary,
 } from "../../types/spreadsheet.js";
 
@@ -23,7 +23,7 @@ const badFill = "FFF6D6D6";
 const neutralFill = "FFF2F2F2";
 const correctedFill = "FFFCE9C8";
 
-/** Reads and updates Excel workbooks with ExcelJS so no custom spreadsheet parsing is required. */
+/** Reads and annotates Excel workbooks with ExcelJS. */
 export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWriter {
   public async readSummary(filePath: string): Promise<SpreadsheetSummary> {
     const sheet = await loadFirstSheet(filePath);
@@ -42,7 +42,7 @@ export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWri
     const sheet = await loadFirstSheet(filePath);
     const { rowNumber: headerRowNumber, headers } = requireHeaderRow(sheet);
     const rows: AddressRow[] = [];
-    const skipped: SkippedRow[] = [];
+    const skipped: number[] = [];
 
     for (let rowNumber = headerRowNumber + 1; rowNumber <= sheet.rowCount; rowNumber += 1) {
       const row = sheet.getRow(rowNumber);
@@ -57,7 +57,7 @@ export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWri
         continue;
       }
       if (parsed.kind === "invalid") {
-        skipped.push({ rowNumber, reason: parsed.reason });
+        skipped.push(rowNumber);
         continue;
       }
       rows.push({ rowNumber, address: parsed.address });
@@ -72,14 +72,7 @@ export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWri
     options: ResultColumnOptions,
   ): Promise<void> {
     const sheet = await loadFirstSheet(filePath);
-    const { columns } = options;
-    const wanted = [
-      columns.standardized,
-      columns.deliverability,
-      columns.location,
-      ...(options.includeRural ? [columns.rural] : []),
-      ...(options.includeArea ? [columns.area] : []),
-    ];
+    const wanted = resultColumnsFor(options.checks);
 
     const { rowNumber: headerRowNumber, headers } = requireHeaderRow(sheet);
     const columnAt = new Map<string, number>();
@@ -95,7 +88,7 @@ export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWri
       /* Widen and wrap the columns we add so the partner reads them without
          resizing; the standardized address is the longest, so it gets more room. */
       const column = sheet.getColumn(nextColumn);
-      column.width = header === columns.standardized ? 36 : 18;
+      column.width = header === RESULT_COLUMNS.standardized ? 36 : 18;
       column.alignment = { wrapText: true, vertical: "top" };
       nextColumn += 1;
     }
@@ -103,18 +96,19 @@ export class ExcelSpreadsheetReader implements SpreadsheetReader, SpreadsheetWri
 
     for (const annotation of annotations) {
       const row = sheet.getRow(annotation.rowNumber);
+      /* A column the checks did not ask for is not in columnAt, so its cell is skipped. */
       if (annotation.standardizedAddress !== undefined) {
-        setResultCell(row, columnAt, columns.standardized, annotation.standardizedAddress, correctedFill);
+        setResultCell(row, columnAt, RESULT_COLUMNS.standardized, annotation.standardizedAddress, correctedFill);
       }
-      setResultCell(row, columnAt, columns.deliverability, annotation.deliverability, fillFor(annotation.deliverability));
+      setResultCell(row, columnAt, RESULT_COLUMNS.deliverability, annotation.deliverability, fillFor(annotation.deliverability));
       if (annotation.location !== undefined) {
-        setResultCell(row, columnAt, columns.location, annotation.location, locationFill(annotation.location));
+        setResultCell(row, columnAt, RESULT_COLUMNS.location, annotation.location, locationFill(annotation.location));
       }
-      if (options.includeRural && annotation.rural !== undefined) {
-        setResultCell(row, columnAt, columns.rural, annotation.rural, fillFor(annotation.rural));
+      if (annotation.rural !== undefined) {
+        setResultCell(row, columnAt, RESULT_COLUMNS.rural, annotation.rural, fillFor(annotation.rural));
       }
-      if (options.includeArea && annotation.area !== undefined) {
-        setResultCell(row, columnAt, columns.area, annotation.area, fillFor(annotation.area));
+      if (annotation.area !== undefined) {
+        setResultCell(row, columnAt, RESULT_COLUMNS.area, annotation.area, fillFor(annotation.area));
       }
       row.commit();
     }
@@ -128,7 +122,7 @@ function setResultCell(
   columnAt: ReadonlyMap<string, number>,
   header: string,
   value: string,
-  fill?: string,
+  fill: string,
 ): void {
   const columnNumber = columnAt.get(header);
   if (columnNumber === undefined) {
@@ -136,9 +130,7 @@ function setResultCell(
   }
   const cell = row.getCell(columnNumber);
   cell.value = value;
-  if (fill !== undefined) {
-    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fill } };
-  }
+  cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: fill } };
 }
 
 /** Green for a passing verdict, red for a failing one, neutral for "Not Verified". */
@@ -183,12 +175,10 @@ async function loadFirstSheet(filePath: string): Promise<ExcelJS.Worksheet> {
 }
 
 /**
- * Checks the file is there and readable before it is parsed.
+ * Check the file exists and is readable before it is parsed.
  *
- * The three failures call for different actions — find the file, fix its
- * permissions, or export it as .xlsx — so they are reported apart. This is checked
- * here rather than inferred from the parser's failure, which reports a missing file
- * and a corrupt one alike.
+ * A missing file, a permissions problem, and a non-workbook need different fixes,
+ * but the parser reports them alike, so the first two are checked here.
  *
  * @throws Error naming the failure in the partner's terms.
  */

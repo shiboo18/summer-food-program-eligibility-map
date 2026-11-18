@@ -79,11 +79,7 @@ describe("SmartyAddressValidator", () => {
     const validator = new SmartyAddressValidator(credentials, () => ({ send }));
 
     await expect(validator.validate([address("1 Main St")])).resolves.toEqual([
-      {
-        status: "unverified",
-        inputAddress: address("1 Main St"),
-        messages: ["Smarty returned an incomplete address result."],
-      },
+      { status: "unverified" },
     ]);
   });
 
@@ -155,20 +151,16 @@ describe("SmartyAddressValidator", () => {
     }));
 
     await expect(validator.validate([address("1 Main St")])).resolves.toEqual([
-      {
-        status: "unverified",
-        inputAddress: address("1 Main St"),
-        messages: ["Smarty could not verify this address."],
-      },
+      { status: "unverified" },
     ]);
   });
 
   test("skips the request and requires both credentials", async () => {
     const createClient = vi.fn<SmartyClientFactory>();
-    const validator = new SmartyAddressValidator(async () => ({ authId: "auth-id", authToken: undefined }), createClient);
+    const validator = new SmartyAddressValidator(async () => undefined, createClient);
 
     await expect(validator.validate([address("1 Main St")])).rejects.toThrow(
-      "Configure Smarty AUTH_ID and AUTH_TOKEN in Settings before verifying.",
+      "Add your Smarty secret key in Settings before running checks.",
     );
     expect(createClient).not.toHaveBeenCalled();
     await expect(validator.validate([])).resolves.toEqual([]);

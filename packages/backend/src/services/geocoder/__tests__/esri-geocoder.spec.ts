@@ -14,7 +14,7 @@ function httpReturning(payload: unknown): { get: HttpGetClient["get"] } {
 }
 
 describe("EsriGeocoder", () => {
-  test("returns the top candidate's point, score, and matched address", async () => {
+  test("returns the top candidate's point, score, and precision", async () => {
     const http = httpReturning({
       candidates: [{ address: "24845 Natchez Trace Rd", location: { x: -88.2646, y: 35.7968 }, score: 100, attributes: { Addr_type: "PointAddress" } }],
     });
@@ -26,7 +26,6 @@ describe("EsriGeocoder", () => {
       point: { lat: 35.7968, lng: -88.2646 },
       score: 100,
       precision: "rooftop",
-      matchedAddress: "24845 Natchez Trace Rd",
     });
   });
 

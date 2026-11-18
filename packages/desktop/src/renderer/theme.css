@@ -1,0 +1,126 @@
+/*
+ * vibeCheck's theme: the one place for its font, colours, type scale, corners,
+ * depth and motion. styles.css lays components out using only these tokens,
+ * and a spec (renderer/__tests__/theme-tokens.spec.ts) keeps it that way.
+ *
+ * Calm white + warm orange in light mode; warm charcoal surfaces in dark mode.
+ * High contrast strengthens text and borders on top of either.
+ */
+@font-face {
+  font-family: "Manrope";
+  font-style: normal;
+  font-weight: 200 800;
+  font-display: swap;
+  src: url("./fonts/manrope-latin-wght-normal.woff2") format("woff2-variations");
+}
+
+:root {
+  /* Corners. Circles (50%) and pills (999px) are shapes, not theme choices. */
+  --radius-lg: 18px;
+  --radius-md: 11px;
+  --radius-sm: 8px;
+
+  /* Type scale. Every font size in styles.css is one of these, and none is
+     smaller than 0.8rem (12.8px). Body text is the 16px most partners read. */
+  --font-size-sm: 0.8rem;
+  --font-size-body: 1rem;
+  --font-size-lead: 1.125rem;
+  --font-size-section: 1.375rem;
+  --font-size-heading: 1.6rem;
+  --font-size-title: clamp(1.7rem, 3.4vw, 2.2rem);
+
+  /* Spacing, on a 4px grid. */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Depth, from a control lifted off the page to a dialog above everything. */
+  --shadow-accent: 0 6px 15px color-mix(in srgb, var(--accent-strong) 14%, transparent);
+  --shadow-raised: 0 10px 28px var(--shadow-color);
+  --shadow-card: 0 14px 36px var(--shadow-color);
+  --shadow-dialog: 0 18px 50px var(--shadow-color);
+
+  /* Motion. Reduce motion (below) zeroes all of it. */
+  --motion-fade: 220ms ease;
+  --motion-reveal: 320ms ease;
+  --motion-progress: 240ms ease-out;
+  --motion-spin: 700ms linear;
+  --motion-pulse: 1.6s ease-in-out;
+
+  font-family: "Manrope", ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+/* Text grows a little on large windows, 16px up to 18px, so a wide layout does
+   not leave it looking small. Every rem-based size follows. */
+html {
+  font-size: clamp(1rem, 0.333vw + 0.708rem, 1.125rem);
+}
+
+html[data-theme="light"] {
+  --page: #fffaf6;
+  --page-accent: #fcebde;
+  --surface: #ffffff;
+  --surface-soft: #fff5ed;
+  --border: #f0ded1;
+  --border-strong: #dfc3b1;
+  --text: #3d332e;
+  --text-soft: #786a62;
+  --text-faint: #9b8c84;
+  --accent: #eaa275;
+  --accent-strong: #d07d4e;
+  --accent-text: #382016;
+  --success: #46765a;
+  --danger: #aa5437;
+  --shadow-color: rgba(92, 61, 43, 0.08);
+  --overlay: rgba(255, 248, 242, 0.88);
+  --focus: rgba(208, 125, 78, 0.36);
+}
+
+html[data-theme="dark"] {
+  --page: #171411;
+  --page-accent: #2a211b;
+  --surface: #211c18;
+  --surface-soft: #2a231e;
+  --border: #3c312a;
+  --border-strong: #58473c;
+  --text: #f3ebe5;
+  --text-soft: #c0b2a9;
+  --text-faint: #93867e;
+  --accent: #eaa77b;
+  --accent-strong: #f6bc92;
+  --accent-text: #29180f;
+  --success: #86c69b;
+  --danger: #f0a083;
+  --shadow-color: rgba(0, 0, 0, 0.28);
+  --overlay: rgba(23, 20, 17, 0.9);
+  --focus: rgba(246, 188, 146, 0.42);
+}
+
+html[data-contrast="high"][data-theme="light"] {
+  --text: #201814;
+  --text-soft: #493b34;
+  --border: #c39f89;
+  --border-strong: #9b6f55;
+  --accent-strong: #a94f1d;
+}
+
+html[data-contrast="high"][data-theme="dark"] {
+  --text: #ffffff;
+  --text-soft: #e4d9d1;
+  --border: #796457;
+  --border-strong: #a48877;
+}
+
+/* Reduce motion, from Appearance settings. */
+html[data-motion="reduced"] *,
+html[data-motion="reduced"] *::before,
+html[data-motion="reduced"] *::after {
+  animation-duration: 0ms !important;
+  transition-duration: 0ms !important;
+}

@@ -1,13 +1,11 @@
 /** Work that runs away from the caller, one piece at a time. */
 export interface BackgroundQueue {
-  /** Queues work to run behind everything already queued. Returns immediately. */
+  /** Queue work behind everything already queued. Returns immediately. */
   enqueue(work: () => Promise<void>): void;
-  /** Resolves once the work queued before this call has finished. */
-  drain(): Promise<void>;
 }
 
 /**
- * A queue for saves a screen should not wait on.
+ * Create a queue for saves a screen should not wait on.
  *
  * @param onError Called with whatever a piece of work threw. The pieces behind it
  *   still run, so one failed save does not strand the ones after it.
@@ -26,7 +24,5 @@ export function createBackgroundQueue(onError: (error: unknown) => void): Backgr
         }
       });
     },
-    /* The tail as it stands when asked, so work queued later is not waited on. */
-    drain: (): Promise<void> => tail,
   };
 }
